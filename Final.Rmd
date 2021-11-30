@@ -77,7 +77,10 @@ census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite = TRUE)
 ## Including Plots
 
 ```{r read}
-Fire_call <- read.socrata("https://data.smgov.net/resource/5y3u-5db4.json")
+# read GeoJson. query the data of EMS only and between March 2021 and November 2021
+# use SoQL in https://dev.socrata.com/foundry/data.smgov.net/5y3u-5db4
+Fire_call <- read.socrata("https://data.smgov.net/resource/5y3u-5db4.json?$where=incident_date between '2021-03-01' and '2021-11-30'&call_type_description=Emergency Medical Service (EMS)")
+
 
 write.csv(Fire_call,"Fire Call.csv")
 
@@ -102,7 +105,7 @@ Sept_Dec19EMS <- Sept_Dec19 %>%
 ```{r Census}
 
 SanMon_Census <- 
-  get_acs(geography = "tract", 
+  get_acs(geography = "census", 
           variables = c("B01003_001", "B19013_001", 
                         "B02001_002", "B08013_001",
                         "B08012_001", "B08301_001", 
