@@ -93,28 +93,32 @@ Fire_call2 <- Fire_call %>%
          dotw = wday(interval60, label=TRUE),
          year = year(interval60),
          month = month(interval60))
-
-Sept_Dec19 <- Fire_call2 %>%
-  filter(year == "2021" & month == c("9","10","11"))
-
-Sept_Dec19EMS <- Sept_Dec19 %>%
-  filter(call_type_description == "Emergency Medical Service (EMS)")%>%
-  mutate(response_time = as.numeric(cleared - received))
 ```
 
 ```{r Census}
 
 SanMon_Census <- 
-  get_acs(geography = "census", 
+  get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
                         "B02001_002", "B08013_001",
                         "B08012_001", "B08301_001", 
-                        "B08301_010", "B01002_001"), 
+                        "B08301_010", "B01002_001", 
+                        "B01001_018","B01001_019",
+                        "B01001_020","B01001_021",
+                        "B01001_022","B01001_023",
+                        "B01001_024","B01001_042",
+                        "B01001_043","B01001_044",
+                        "B01001_045","B01001_046", 
+                        "B01001_047","B01001_048",
+                        "B01001_049","B01001_003",
+                        "B01001_004","B01001_027",
+                        "B01001_028", "B08301_010",
+                        "B17001_002"), 
           year = 2019, 
           state = "CA", 
           geometry = TRUE, 
-          county=c("Los Angeles"),
-          output = "wide") %>%
+          county="Los Angeles",
+          output = "wide")%>%
   rename(Total_Pop =  B01003_001E,
          Med_Inc = B19013_001E,
          Med_Age = B01002_001E,
@@ -122,11 +126,15 @@ SanMon_Census <-
          Travel_Time = B08013_001E,
          Num_Commuters = B08012_001E,
          Means_of_Transport = B08301_001E,
-         Total_Public_Trans = B08301_010E) %>%
+         Total_Public_Trans = B08301_010E,
+         Below_poverty = B17001_002E
+         ) %>%
+  mutate(Age_60above = B01001_018E + B01001_019E + B01001_020E + B01001_021E + B01001_022E +B01001_023E + B01001_024E + B01001_042E + B01001_043E + B01001_044E + B01001_045E,B01001_046E + B01001_047E + B01001_048E+ B01001_049E,
+         Age_10below = B01001_003E + B01001_004E + B01001_027E + B01001_028E) %>%
   select(Total_Pop, Med_Inc, White_Pop, Travel_Time,
          Means_of_Transport, Total_Public_Trans,
          Med_Age,
-         GEOID, geometry) %>%
+         GEOID, geometry, Age_60above,Age_10below) %>%
   mutate(Percent_White = White_Pop / Total_Pop,
          Mean_Commute_Time = Travel_Time / Total_Public_Trans,
          Percent_Taking_Public_Trans = Total_Public_Trans / Means_of_Transport)%>%
@@ -139,6 +147,15 @@ SanMonTracts <-
   select(GEOID, geometry) %>% 
   st_sf
 
+```
+
+```{r crime}
+SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
+  filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description))
+
+write.csv(SanMon_Crime, "Crime.csv")
+
+unique(SanMon_Crime$ucr_description)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
