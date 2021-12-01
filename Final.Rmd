@@ -147,6 +147,8 @@ SanMonTracts <-
   select(GEOID, geometry) %>% 
   st_sf
 
+Fire_Station <-
+  st_read("Fire_Station.kml")
 ```
 
 ```{r crime}
@@ -156,6 +158,21 @@ SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$wh
 write.csv(SanMon_Crime, "Crime.csv")
 
 unique(SanMon_Crime$ucr_description)
+```
+
+```{r weather}
+weather.Panel <- 
+  riem_measures(station = "SMO", date_start = "2021-03-01", date_end = "2021-11-30") %>%
+  dplyr::select(valid, tmpf, p01i, sknt)%>%
+  replace(is.na(.), 0) %>%
+    mutate(interval60 = ymd_h(substr(valid,1,13))) %>%
+    mutate(week = week(interval60),
+           dotw = wday(interval60, label=TRUE)) %>%
+    group_by(interval60) %>%
+    summarize(Temperature = max(tmpf),
+              Precipitation = sum(p01i),
+              Wind_Speed = max(sknt)) %>%
+    mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
