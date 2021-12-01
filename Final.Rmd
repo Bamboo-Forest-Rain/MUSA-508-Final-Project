@@ -97,12 +97,8 @@ Fire_call2 <- Fire_call %>%
 
 ```
 
-<<<<<<< HEAD
-```{r Census}
-=======
-```{r Census Haha}
 
->>>>>>> 1e68f2f5dcf6651a1d0bd15c08bac7bf30ee32c6
+```{r Census}
 SanMon_Census <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
@@ -139,16 +135,14 @@ SanMonTracts <-
   st_sf
 ```
 
-<<<<<<< HEAD
 The NAs are mainly in location, which can only be omited for later process.
 ```{r}
 # check NAs in the dataset
 aggr(Fire_call, prop = F, number = T)
-=======
-Fire_Station <-
-  st_read("Fire_Station.kml")
->>>>>>> 1e68f2f5dcf6651a1d0bd15c08bac7bf30ee32c6
+
+Fire_Station <- st_read("Fire_Station.kml")
 ```
+
 ```{r}
 Fire_call <- na.omit(Fire_call)
 Fire_call_geo <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs = 4326, agr = "constant")
@@ -165,8 +159,7 @@ ggplot() +
 
 ```
 
-<<<<<<< HEAD
-=======
+
 ```{r weather}
 weather.Panel <- 
   riem_measures(station = "SMO", date_start = "2021-03-01", date_end = "2021-11-30") %>%
@@ -182,5 +175,3 @@ weather.Panel <-
     mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
->>>>>>> 1e68f2f5dcf6651a1d0bd15c08bac7bf30ee32c6
