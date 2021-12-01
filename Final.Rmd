@@ -27,6 +27,7 @@ library(gganimate)
 library(gifski)
 library(caret)
 library(RSocrata)
+library(VIM) # check NAs
 
 plotTheme <- theme(
   plot.title =element_text(size=12),
@@ -71,7 +72,7 @@ palette2 <- c("#6baed6","#08519c")
 
 ```{r install_census_API_key, warning = FALSE, include=FALSE, eval = TRUE}
 # Install Census API Key
-census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite = TRUE)
+census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite = TRUE, install = TRUE)
 ```
 
 ## Including Plots
@@ -94,18 +95,11 @@ Fire_call2 <- Fire_call %>%
          year = year(interval60),
          month = month(interval60))
 
-Sept_Dec19 <- Fire_call2 %>%
-  filter(year == "2021" & month == c("9","10","11"))
-
-Sept_Dec19EMS <- Sept_Dec19 %>%
-  filter(call_type_description == "Emergency Medical Service (EMS)")%>%
-  mutate(response_time = as.numeric(cleared - received))
 ```
 
 ```{r Census}
-
 SanMon_Census <- 
-  get_acs(geography = "census", 
+  get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
                         "B02001_002", "B08013_001",
                         "B08012_001", "B08301_001", 
@@ -138,7 +132,26 @@ SanMonTracts <-
   distinct(GEOID, .keep_all = TRUE) %>%
   select(GEOID, geometry) %>% 
   st_sf
+```
+
+The NAs are mainly in location, which can only be omited for later process.
+```{r}
+# check NAs in the dataset
+aggr(Fire_call, prop = F, number = T)
+```
+```{r}
+Fire_call <- na.omit(Fire_call)
+Fire_call_geo <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs = 4326, agr = "constant")
+```
+
+```{r}
+Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
+
+
+ggplot() + 
+  geom_sf(data = SanMon_Census, colour="red", size=0.1, show.legend = "point") +
+  geom_sf(data = Fire_call_geo) +
+  mapTheme(title_size = 30)
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
