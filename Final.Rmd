@@ -95,7 +95,7 @@ Fire_call2 <- Fire_call %>%
          month = month(interval60))
 ```
 
-```{r Census}
+```{r Census Haha}
 
 SanMon_Census <- 
   get_acs(geography = "tract", 
