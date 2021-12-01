@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>Fire_Station.kml</name>
+	<StyleMap id="m_ylw-pushpin">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_ylw-pushpin</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#s_ylw-pushpin_hl</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="s_ylw-pushpin_hl">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="s_ylw-pushpin">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Folder>
+		<name>My Places</name>
+		<open>1</open>
+		<Style>
+			<ListStyle>
+				<listItemType>check</listItemType>
+				<ItemIcon>
+					<state>open</state>
+					<href>:/mysavedplaces_open.png</href>
+				</ItemIcon>
+				<ItemIcon>
+					<state>closed</state>
+					<href>:/mysavedplaces_closed.png</href>
+				</ItemIcon>
+				<bgColor>00ffffff</bgColor>
+				<maxSnippetLines>2</maxSnippetLines>
+			</ListStyle>
+		</Style>
+		<Placemark>
+			<name>Station 1</name>
+			<LookAt>
+				<longitude>-118.4926772905335</longitude>
+				<latitude>34.01941396745429</latitude>
+				<altitude>0</altitude>
+				<heading>8.892900728949425e-05</heading>
+				<tilt>18.93154274453721</tilt>
+				<range>363.5802945063627</range>
+				<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+			</LookAt>
+			<styleUrl>#m_ylw-pushpin</styleUrl>
+			<Point>
+				<gx:drawOrder>1</gx:drawOrder>
+				<coordinates>-118.4926772905335,34.01941396745429,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>Station 2</name>
+			<LookAt>
+				<longitude>-118.4845210926346</longitude>
+				<latitude>34.00463076247346</latitude>
+				<altitude>0</altitude>
+				<heading>6.500418256238863e-05</heading>
+				<tilt>12.06622774846136</tilt>
+				<range>529.7503953892647</range>
+				<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+			</LookAt>
+			<styleUrl>#m_ylw-pushpin</styleUrl>
+			<Point>
+				<gx:drawOrder>1</gx:drawOrder>
+				<coordinates>-118.4845210926346,34.00463076247346,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>Station 3</name>
+			<LookAt>
+				<longitude>-118.4825175882295</longitude>
+				<latitude>34.02886068632503</latitude>
+				<altitude>0</altitude>
+				<heading>6.795363215805972e-09</heading>
+				<tilt>4.413502479872483</tilt>
+				<range>793.517779441001</range>
+				<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+			</LookAt>
+			<styleUrl>#m_ylw-pushpin</styleUrl>
+			<Point>
+				<gx:drawOrder>1</gx:drawOrder>
+				<coordinates>-118.4825175882295,34.02886068632504,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>Station 5</name>
+			<LookAt>
+				<longitude>-118.456627</longitude>
+				<latitude>34.0145348</latitude>
+				<altitude>0</altitude>
+				<heading>-7.95138670365879e-15</heading>
+				<tilt>0</tilt>
+				<range>1000.000000000165</range>
+				<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+			</LookAt>
+			<styleUrl>#m_ylw-pushpin</styleUrl>
+			<Point>
+				<gx:drawOrder>1</gx:drawOrder>
+				<coordinates>-118.456627,34.01453480000001,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>Station 7</name>
+			<LookAt>
+				<longitude>-118.3918656136838</longitude>
+				<latitude>33.86347277599217</latitude>
+				<altitude>0</altitude>
+				<heading>2.716406194008668e-06</heading>
+				<tilt>19.94590491699582</tilt>
+				<range>369.8126430687599</range>
+				<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+			</LookAt>
+			<styleUrl>#m_ylw-pushpin</styleUrl>
+			<Point>
+				<gx:drawOrder>1</gx:drawOrder>
+				<coordinates>-118.3918656136838,33.86347277599216,0</coordinates>
+			</Point>
+		</Placemark>
+	</Folder>
+</Document>
+</kml>
