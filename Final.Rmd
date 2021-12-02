@@ -139,26 +139,42 @@ The NAs are mainly in location, which can only be omited for later process.
 ```{r}
 # check NAs in the dataset
 aggr(Fire_call, prop = F, number = T)
-
-Fire_Station <- st_read("Fire_Station.kml")
 ```
 
 ```{r}
 Fire_call <- na.omit(Fire_call)
 Fire_call_geo <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs = 4326, agr = "constant")
+Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 ```
 
 ```{r}
-Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
+#fire station location
+station <- st_read("Fire_Station/doc.kml")
+station <- st_zm(station) %>% st_transform(st_crs(SanMon_Census))   #drop the third dimension of coordinates
+#delete the station outside of boundary
+Boundary = st_union(SanMon_Census)
+station <- station[Boundary,]
 
 
-ggplot() + 
-  geom_sf(data = SanMon_Census, colour="red", size=0.1, show.legend = "point") +
-  geom_sf(data = Fire_call_geo) +
-  mapTheme(title_size = 30)
-
+# road network
+road <- st_read("https://opendata.arcgis.com/datasets/6728cb1cb2724dc5ad07f7994484f054_0.geojson")
 ```
 
+
+```{r fig.height=6, fig.width=6}
+ggplot() + 
+  geom_sf(data = SanMon_Census, colour="red",fill="grey40", size=0.1) +
+  geom_sf(data = road,color = 'grey80') +
+  geom_sf(data = Fire_call_geo,aes(color = 'yellow')) +
+  geom_sf(station,mapping = aes(color='red',size=1.5)) + # don
+  scale_color_manual(values = c( 'red', 'yellow'),
+                    labels = c('Station', 'EMS call'))+
+  guides(size =F)+
+  labs(title = "EMS calls and station map") +
+  mapTheme(title_size = 30)
+
+
+```
 
 ```{r weather}
 weather.Panel <- 
