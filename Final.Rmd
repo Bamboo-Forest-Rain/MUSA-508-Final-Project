@@ -161,7 +161,7 @@ road <- st_read("https://opendata.arcgis.com/datasets/6728cb1cb2724dc5ad07f79944
 ```
 
 
-```{r fig.height=6, fig.width=6}
+```{r fig.height=5, fig.width=5}
 ggplot() + 
   geom_sf(data = SanMon_Census, colour="red",fill="grey40", size=0.1) +
   geom_sf(data = road,color = 'grey80') +
