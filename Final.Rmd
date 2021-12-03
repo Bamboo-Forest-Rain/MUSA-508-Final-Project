@@ -93,7 +93,8 @@ Fire_call2 <- Fire_call %>%
          week = week(interval60),
          dotw = wday(interval60, label=TRUE),
          year = year(interval60),
-         month = month(interval60))
+         month = month(interval60),
+         response_time = as.numeric(received - cleared))
 
 ```
 
@@ -113,7 +114,8 @@ SanMon_Census <-
           county=c("Los Angeles"),
           output = "wide") %>%
   mutate(Age_above60 = B01001_018E + B01001_019E + B01001_020E + B01001_021E + B01001_022E + B01001_023E + B01001_024E + B01001_025E + B01001_042E + B01001_043E + B01001_044E + B01001_045E + B01001_046E + B01001_047E + B01001_048E + B01001_049E,
-         Age_below10 = B01001_027E + B01001_028E + B01001_003E + B01001_004E) %>%
+         Age_below10 = B01001_027E + B01001_028E + B01001_003E + B01001_004E,
+         ) %>%
   rename(Total_Pop =  B01003_001E,
          Med_Inc = B19013_001E,
          Med_Age = B01002_001E,
@@ -193,5 +195,17 @@ weather.Panel <-
               Precipitation = sum(p01i),
               Wind_Speed = max(sknt)) %>%
     mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
+```
+
+```{r Kernal Density}
+as.data.frame(Fire_call2) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = st_crs(SanMonTracts)) %>%
+  aggregate(., SanMonTracts, mean) %>%
+   ggplot() +
+     geom_sf(aes(fill=value)) +
+     geom_sf(data = sample_n(burglaries, 1500), size = .5) +
+     scale_fill_viridis(name = "Density") +
+     labs(title = "Kernel density of 2017 burglaries") +
+     mapTheme()
 ```
 
