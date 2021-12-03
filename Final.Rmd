@@ -99,7 +99,7 @@ Fire_call2 <- Fire_call %>%
 ```
 
 
-```{r Census}
+```{r Census with Age}
 SanMon_Census <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
