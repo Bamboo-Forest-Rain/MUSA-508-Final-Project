@@ -204,7 +204,7 @@ SanMon_Bound <- st_read("https://opendata.arcgis.com/datasets/d1a7c19d793c482b92
   st_transform('ESRI:102271') 
 
 fishnet <- 
-  st_make_grid(SanMon_Bound, cellsize = 200) %>%
+  st_make_grid(SanMon_Bound, cellsize = 100) %>%
   st_sf() %>%
   mutate(uniqueID = rownames(.))
 
@@ -229,9 +229,11 @@ ggplot() +
   labs(title = "Count of EMS calls for the fishnet") +
   mapTheme()
 ```
+
+
 ```{r Kernal Density}
 EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
-EMS_KD <- density.ppp(EMS_ppp, 1000)
+EMS_KD <- density.ppp(EMS_ppp, 2)
 
 Fire_call_geo <-
   Fire_call_geo %>%
@@ -256,3 +258,22 @@ ggplot()+
          subtitle="2017 burglar risk predictions; 2018 burglaries") +
     mapTheme()
 ```
+
+```{r}
+Fire_call_geo <- Fire_call_geo %>% 
+  st_transform(st_crs(SanMon_Census)) %>% 
+  mutate(x = gsub("[()]", "", geometry)) %>%  # [ab] means a or b 
+  separate(x,into= c("Y","X"), sep=",") %>% 
+  mutate(Y = gsub("c-", "", Y)) %>% 
+  mutate(X = as.numeric(X),Y = as.numeric(Y))
+
+ggplot() + 
+  geom_sf(data = Boundary, fill = "grey40") +
+  stat_density2d(data = data.frame(st_coordinates(Fire_call_geo)), 
+                 aes(X, Y, fill = ..level.., alpha = ..level..),
+                 size = 0.01, bins = 40, geom = 'polygon') +
+  scale_fill_viridis() +
+  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
+  mapTheme(title_size = 14) + theme(legend.position = "none")
+```
+
