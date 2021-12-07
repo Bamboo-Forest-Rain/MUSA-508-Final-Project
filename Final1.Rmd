@@ -28,6 +28,7 @@ library(gifski)
 library(caret)
 library(RSocrata)
 library(VIM) # check NAs
+library(ggplot2)
 
 plotTheme <- theme(
   plot.title =element_text(size=12),

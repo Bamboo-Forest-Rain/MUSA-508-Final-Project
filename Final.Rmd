@@ -229,8 +229,6 @@ ggplot() +
   labs(title = "Count of EMS calls for the fishnet") +
   mapTheme()
 ```
-
-
 ```{r Kernal Density}
 EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
 EMS_KD <- density.ppp(EMS_ppp, 2)
@@ -243,7 +241,7 @@ EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
   st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
   aggregate(., fishnet, mean) %>%
   mutate(label = "Kernel Density",
-         EMS_Demand = ntile(value, 100)) %>%
+         EMS_Demand = ntile(value, 300)) %>%
   cbind(
     aggregate(
       dplyr::select(Fire_call_geo) %>% mutate(EMSCount = 1), ., sum) %>%
@@ -269,6 +267,17 @@ Fire_call_geo <- Fire_call_geo %>%
 
 ggplot() + 
   geom_sf(data = Boundary, fill = "grey40") +
+  stat_density2d(data = data.frame(st_coordinates(Fire_call_geo)), 
+                 aes(X, Y, fill = ..level.., alpha = ..level..),
+                 size = 0.01, bins = 40, geom = 'polygon') +
+  scale_fill_viridis() +
+  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
+  mapTheme(title_size = 14) + theme(legend.position = "none")
+```
+```{r}
+
+ggplot() + 
+  geom_sf(data = Boundary, fill = "white", color = "grey40") +
   stat_density2d(data = data.frame(st_coordinates(Fire_call_geo)), 
                  aes(X, Y, fill = ..level.., alpha = ..level..),
                  size = 0.01, bins = 40, geom = 'polygon') +
