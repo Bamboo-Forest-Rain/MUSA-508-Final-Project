@@ -151,8 +151,15 @@ SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$wh
 
 SanMon_Crime <- 
   SanMon_Crime %>% na.omit()%>%
-  st_as_sf(coords = c("longitude","latitude"),agr = "constant") %>%
-  st_transform(st_crs(SanMon_Census))
+  filter(longitude != "0.0")%>%
+  st_as_sf(coords = c("longitude","latitude"),agr = "constant")
+  
+SanMon_Crime <- st_set_crs(SanMon_Crime,4326) %>%
+  select(geometry, ucr)%>%
+  st_transform(st_crs(Fire_call))
+
+Fire_call <- 
+  st_join(Fire_call,SanMon_Crime)
  
 write.csv(SanMon_Crime, "Crime.csv")
  
@@ -226,7 +233,7 @@ fishnet <-
 
 fishnet <- fishnet[SanMon_Bound,]
 
-fishnet <-st_transform(fishnet, crs = 4326)
+fishnet <-st_transform(fishnet, st_crs(Fire_call))
 ```
 
 ```{r Call Count}
@@ -237,6 +244,18 @@ EMS_net <-
   mutate(countEMS = replace_na(countEMS, 0),
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
+
+EMS_net_crime <- 
+  dplyr::select(Fire_call) %>% na.omit()%>%
+  mutate(countCrime = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countCrime = replace_na(countCrime, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
+  select(geometry,countCrime)
+
+EMS_net <-
+  st_join(EMS_net,EMS_net_crime)
 
 EMS_net_res <-
   st_join(EMS_net,Fire_call)%>%
@@ -340,10 +359,13 @@ fishnet_all <-
   st_join(EMS_net_res,SanMon_Census) 
 
 fishnet_all <-
-  st_join(fishnet_all, SanMon_Crime)
+  left_join(fishnet_all,weather.Panel)
+
+str(fishnet_all)
 
 fishnet_all <-
-  left_join(fishnet_all,weather.Panel)
+  fishnet_all %>%
+  select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 ```
 
 ```{r Regression}
@@ -351,28 +373,98 @@ fishnet_all <-
 ride.Train <- filter(fishnet_all, week < 35)
 ride.Test <- filter(fishnet_all, week >= 35)
 
-#See Pickupby week
-group_by(ride.Train, week, uniqueID) %>%
+#See Call by Month
+group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
   summarize(countEMS = sum(countEMS)) %>%
   ungroup() %>% 
   ggplot() + geom_sf(data = SanMon_Bound, fill="grey50") + geom_sf(aes(fill = countEMS)) +
-    facet_wrap(~week, ncol = 8) +
+    facet_wrap(~month, ncol = 8) +
     scale_fill_viridis_b(name = "EMS Call Count") +
-    labs(title="Sum of calls by fishnet by week") +
+    labs(title="Sum of calls by fishnet by Month") +
     mapTheme() + theme(legend.position = "bottom") 
 
 ```
 
 ```{r week lag}
+#str(fishnet_all)
+
+#study.panel <- 
+ # expand.grid(interval60=unique(fishnet_all$interval60), 
+   #           uniqueID = unique(fishnet_all$uniqueID)) %>%
+  #left_join(., fishnet_all %>%
+    #          select(uniqueID, map_point.latitude.x, map_point.longitude.x)%>%
+     #         distinct() %>%
+      #        group_by(uniqueID) %>%
+       #       slice(1))
+```
+```{r Correlation}
+
 str(fishnet_all)
 
-study.panel <- 
-  expand.grid(interval60=unique(fishnet_all$interval60), 
-              uniqueID = unique(fishnet_all$uniqueID)) %>%
-  left_join(., fishnet_all %>%
-              select(uniqueID, map_point.latitude.x, map_point.longitude.x)%>%
-              distinct() %>%
-              group_by(uniqueID) %>%
-              slice(1))
+correlation.long <-
+  st_drop_geometry(fishnet_all) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw) %>%
+    gather(Variable, Value, -countEMS)
+
+correlation.cor <-
+  correlation.long %>%
+    group_by(Variable) %>%
+    summarize(correlation = cor(Value, countEMS, use = "complete.obs"))
+
+ggplot(correlation.long, aes(Value, countEMS)) +
+  geom_point(size = 0.1) +
+  geom_text(data = correlation.cor, aes(label = paste("r =", round(correlation, 2))),
+            x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~Variable, ncol = 2, scales = "free") +
+  labs(title = "Burglary count as a function of risk factors") +
+  plotTheme()
+
 ```
 
+```{r Regression}
+reg1 <- 
+    lm(countEMS ~  Age_above60 + Age_below10 + Med_Inc + countCrime, data=ride.Train)
+
+reg2 <- 
+  lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature, data=ride.Train)
+
+```
+
+```{r}
+ride.Test.weekNest <- 
+  ride.Test %>%
+  nest(-week)
+```
+
+
+```{r predict_function }
+model_pred <- function(dat, fit){
+   pred <- predict(fit, newdata = dat)}
+```
+
+
+
+```{r do_predicitons, results = TRUE}
+week_predictions <- 
+  ride.Test.weekNest %>% 
+    mutate(OnlySocial = map(.x = data, fit = reg1, .f = model_pred),
+           SocialwithTemp = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
+    mutate(Observed = map(data, pull, countEMS),
+           Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
+           MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
+           sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
+
+week_predictions
+```
+
+```{r}
+week_predictions %>%
+  dplyr::select(week, Regression, MAE) %>%
+  gather(Variable, MAE, -Regression, -week) %>%
+  ggplot(aes(week, MAE)) + 
+    geom_bar(aes(fill = Regression), position = "dodge", stat="identity") +
+    scale_fill_manual(values = palette5) +
+    labs(title = "Mean Absolute Errors by model specification and week", caption = "Fig 8") +
+  plotTheme()
+```
