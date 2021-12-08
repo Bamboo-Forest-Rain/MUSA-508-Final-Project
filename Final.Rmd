@@ -85,6 +85,8 @@ census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE)
 # use SoQL in https://dev.socrata.com/foundry/data.smgov.net/5y3u-5db4
 Fire_call <- read.socrata("https://data.smgov.net/resource/5y3u-5db4.json?$where=incident_date between '2021-03-01' and '2021-11-30'&call_type_description=Emergency Medical Service (EMS)")
 
+Fire_call <- Fire_call %>%
+  st_as_sf(coords = c("longitude","latitude"), crs = 4326, arg ="constant")
 
 write.csv(Fire_call,"Fire Call.csv")
 
@@ -96,6 +98,7 @@ Fire_call <- Fire_call %>%
          year = year(interval60),
          month = month(interval60),
          response_time = abs(as.numeric(received - cleared)))
+
   
 mean(Fire_call$response_time)
 #average response time 29.81 minutes
@@ -145,6 +148,22 @@ SanMonTracts <-
   st_sf
 ```
 
+
+The NAs are mainly in location, which can only be omited for later process.
+```{r}
+# check NAs in the dataset
+aggr(Fire_call, prop = F, number = T)
+```
+
+```{r}
+Fire_call <- na.omit(Fire_call)
+Fire_call <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs=4326
+                                        ,agr = "constant")
+Fire_call_geo <- Fire_call %>% select(geometry,location)
+Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
+
+```
+
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
   filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description)) 
@@ -163,21 +182,6 @@ Fire_call <-
  
 write.csv(SanMon_Crime, "Crime.csv")
  
-unique(SanMon_Crime$ucr_description)
-```
-
-The NAs are mainly in location, which can only be omited for later process.
-```{r}
-# check NAs in the dataset
-aggr(Fire_call, prop = F, number = T)
-```
-
-```{r}
-Fire_call <- na.omit(Fire_call)
-Fire_call <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs=4326
-                                        ,agr = "constant")
-Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
-
 ```
 
 ```{r}
@@ -194,6 +198,7 @@ road <- st_read("https://opendata.arcgis.com/datasets/6728cb1cb2724dc5ad07f79944
 ```
 
 
+
 ```{r fig.height=5, fig.width=5}
 ggplot() + 
   geom_sf(data = SanMon_Census, colour="red",fill="grey40", size=0.1) +
@@ -207,6 +212,7 @@ ggplot() +
   mapTheme(title_size = 30)
 
 ```
+
 
 ```{r weather}
 weather.Panel <- 
@@ -331,7 +337,7 @@ ggplot() +
                  aes(X, Y, fill = ..level.., alpha = ..level..),
                  size = 0.01, bins = 40, geom = 'polygon') +
   scale_fill_viridis() +
-  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
+  scale_alpha(range = c(0.00, 0.50), guide = FALSE) +
   mapTheme(title_size = 14) + theme(legend.position = "none")
 ```
 ```{r lag}
@@ -353,6 +359,8 @@ ggplot() +
 ```
 
 ```{r combine census info with fishnet}
+
+#Joining Census Data with Fishnet
 
 EMS_net_res <- st_transform(EMS_net_res,st_crs(SanMon_Census))
 
@@ -400,8 +408,7 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
 ```
 ```{r Correlation}
 
-str(fishnet_all)
-
+#Plots to look at correlations between interested variables
 correlation.long <-
   st_drop_geometry(fishnet_all) %>%
     dplyr::select(-uniqueID, -cvID, -dotw) %>%
@@ -424,6 +431,8 @@ ggplot(correlation.long, aes(Value, countEMS)) +
 ```
 
 ```{r Regression}
+
+#Add Regressions
 reg1 <- 
     lm(countEMS ~  Age_above60 + Age_below10 + Med_Inc + countCrime, data=ride.Train)
 
@@ -433,6 +442,8 @@ reg2 <-
 ```
 
 ```{r}
+
+#Add Test Week Nest
 ride.Test.weekNest <- 
   ride.Test %>%
   nest(-week)
@@ -440,6 +451,8 @@ ride.Test.weekNest <-
 
 
 ```{r predict_function }
+#Function to predict by week
+
 model_pred <- function(dat, fit){
    pred <- predict(fit, newdata = dat)}
 ```
@@ -447,6 +460,8 @@ model_pred <- function(dat, fit){
 
 
 ```{r do_predicitons, results = TRUE}
+#Prediction by weeks
+
 week_predictions <- 
   ride.Test.weekNest %>% 
     mutate(OnlySocial = map(.x = data, fit = reg1, .f = model_pred),
@@ -460,6 +475,8 @@ week_predictions
 ```
 
 ```{r}
+
+#Absolute Errors Comparison between regressions
 week_predictions %>%
   dplyr::select(week, Regression, MAE) %>%
   gather(Variable, MAE, -Regression, -week) %>%
