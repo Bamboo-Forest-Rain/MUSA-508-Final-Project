@@ -30,7 +30,7 @@ library(RSocrata)
 library(FNN)
 library(spdep)
 library(spatstat)
-library(VIM) # check NAs
+#library(VIM) # check NAs
 
 plotTheme <- theme(
   plot.title =element_text(size=12),
@@ -75,7 +75,7 @@ palette2 <- c("#6baed6","#08519c")
 
 ```{r install_census_API_key, warning = FALSE, include=FALSE, eval = TRUE}
 # Install Census API Key
-census_api_key("e79f3706b6d61249968c6ce88794f6f556e5bf3d", overwrite = TRUE, install = TRUE)
+census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE)
 ```
 
 ## Including Plots
@@ -88,17 +88,17 @@ Fire_call <- read.socrata("https://data.smgov.net/resource/5y3u-5db4.json?$where
 
 write.csv(Fire_call,"Fire Call.csv")
 
-str(Fire_call)
-
-Fire_call2 <- Fire_call %>%
+Fire_call <- Fire_call %>%
   mutate(interval60 = floor_date(ymd_hms(received), unit = "hour"),
          interval15 = floor_date(ymd_hms(received), unit = "15 mins"),
          week = week(interval60),
          dotw = wday(interval60, label=TRUE),
          year = year(interval60),
          month = month(interval60),
-         response_time = as.numeric(received - cleared))
-
+         response_time = abs(as.numeric(received - cleared)))
+  
+mean(Fire_call$response_time)
+#average response time 29.81 minutes
 ```
 
 
@@ -134,14 +134,29 @@ SanMon_Census <-
   mutate(Percent_White = White_Pop / Total_Pop,
          Mean_Commute_Time = Travel_Time / Total_Public_Trans,
          Percent_Taking_Public_Trans = Total_Public_Trans / Means_of_Transport)%>%
-  filter(GEOID == "06037701304" | GEOID == "06037701201" | GEOID == "06037701601" |GEOID == "06037701202"|GEOID == "06037701302"|GEOID == "06037701402"|GEOID == "06037701602"|GEOID == "06037701502"|GEOID == "06037701701"|GEOID == "06037701702"|GEOID == "06037701801"| GEOID == "06037701802"|GEOID == "06037701902"|GEOID == "06037702300"|GEOID == "06037702201"|GEOID == "06037702002"|GEOID == "06037702202"|GEOID == "06037702102"|GEOID == "06037701501")
-
+  filter(GEOID == "06037701304" | GEOID == "06037701201" | GEOID == "06037701601" |GEOID == "06037701202"|GEOID == "06037701302"|GEOID == "06037701402"|GEOID == "06037701602"|GEOID == "06037701502"|GEOID == "06037701701"|GEOID == "06037701702"|GEOID == "06037701801"| GEOID == "06037701802"|GEOID == "06037701902"|GEOID == "06037702300"|GEOID == "06037702201"|GEOID == "06037702002"|GEOID == "06037702202"|GEOID == "06037702102"|GEOID == "06037701501")%>%
+  st_sf()
+ 
 SanMonTracts <- 
   SanMon_Census %>%
   as.data.frame() %>%
-  distinct(GEOID, .keep_all = TRUE) %>%
+  distinct(GEOID, .keest_crsp_all = TRUE) %>%
   select(GEOID, geometry) %>% 
   st_sf
+```
+
+```{r crime}
+SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
+  filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description)) 
+
+SanMon_Crime <- 
+  SanMon_Crime %>% na.omit()%>%
+  st_as_sf(coords = c("longitude","latitude"),agr = "constant") %>%
+  st_transform(st_crs(SanMon_Census))
+ 
+write.csv(SanMon_Crime, "Crime.csv")
+ 
+unique(SanMon_Crime$ucr_description)
 ```
 
 The NAs are mainly in location, which can only be omited for later process.
@@ -152,8 +167,9 @@ aggr(Fire_call, prop = F, number = T)
 
 ```{r}
 Fire_call <- na.omit(Fire_call)
-Fire_call_geo <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs = 4326, agr = "constant")
-Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
+Fire_call <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs=4326
+                                        ,agr = "constant")
+
 ```
 
 ```{r}
@@ -204,31 +220,55 @@ SanMon_Bound <- st_read("https://opendata.arcgis.com/datasets/d1a7c19d793c482b92
   st_transform('ESRI:102271') 
 
 fishnet <- 
-  st_make_grid(SanMon_Bound, cellsize = 100) %>%
+  st_make_grid(SanMon_Bound, cellsize = 200) %>%
   st_sf() %>%
   mutate(uniqueID = rownames(.))
 
 fishnet <- fishnet[SanMon_Bound,]
 
+fishnet <-st_transform(fishnet, crs = 4326)
 ```
 
 ```{r Call Count}
 EMS_net <- 
-  dplyr::select(Fire_call_geo) %>% 
-  st_transform('ESRI:102271')%>%
+  dplyr::select(Fire_call) %>% 
   mutate(countEMS = 1) %>% 
   aggregate(., fishnet, sum) %>%
   mutate(countEMS = replace_na(countEMS, 0),
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
+EMS_net_res <-
+  st_join(EMS_net,Fire_call)%>%
+  group_by(uniqueID)%>%
+  mutate(mean_response = mean(response_time))%>%
+  ungroup 
+  
+EMS_net_res$mean_response[is.na(EMS_net_res$mean_response)] <- 0
+
+EMS_net_res <-
+  EMS_net_res %>%
+  filter(mean_response < 10000)
+  
+
 ggplot() +
-  geom_sf(data = SanMon_Bound, aes(color = "red")) +
+  geom_sf(data = SanMon_Bound) +
   geom_sf(data = EMS_net, aes(fill = countEMS)) +
   scale_fill_viridis() +
-  labs(title = "Count of EMS calls for the fishnet") +
+  labs(title = "Count of EMS calls for the fishnet",
+       fill = "EMS call Count") +
+  mapTheme()
+
+ggplot() +
+  geom_sf(data = EMS_net_res, aes(fill = mean_response))+
+  geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
+  scale_fill_viridis_b()+
+  labs(title = "Response time in Santa Monica", fill = "Second")+
   mapTheme()
 ```
+
+
+
 ```{r Kernal Density}
 EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
 EMS_KD <- density.ppp(EMS_ppp, 2)
@@ -244,7 +284,7 @@ EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
          EMS_Demand = ntile(value, 300)) %>%
   cbind(
     aggregate(
-      dplyr::select(Fire_call_geo) %>% mutate(EMSCount = 1), ., sum) %>%
+      dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
     mutate(EMSCount = replace_na(EMSCount, 0))) %>%
   dplyr::select(label, EMS_Demand, EMSCount)
 
@@ -258,7 +298,7 @@ ggplot()+
 ```
 
 ```{r}
-Fire_call_geo <- Fire_call_geo %>% 
+Fire_call <- Fire_call %>% 
   st_transform(st_crs(SanMon_Census)) %>% 
   mutate(x = gsub("[()]", "", geometry)) %>%  # [ab] means a or b 
   separate(x,into= c("Y","X"), sep=",") %>% 
@@ -267,22 +307,72 @@ Fire_call_geo <- Fire_call_geo %>%
 
 ggplot() + 
   geom_sf(data = Boundary, fill = "grey40") +
-  stat_density2d(data = data.frame(st_coordinates(Fire_call_geo)), 
+  stat_density2d(data = data.frame(st_coordinates(Fire_call)), 
                  aes(X, Y, fill = ..level.., alpha = ..level..),
                  size = 0.01, bins = 40, geom = 'polygon') +
   scale_fill_viridis() +
   scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
   mapTheme(title_size = 14) + theme(legend.position = "none")
 ```
-```{r}
+```{r lag}
+#EMS_net_res_nona <-
+ # EMS_net_res %>%
+  #na.omit()
 
-ggplot() + 
-  geom_sf(data = Boundary, fill = "white", color = "grey40") +
-  stat_density2d(data = data.frame(st_coordinates(Fire_call_geo)), 
-                 aes(X, Y, fill = ..level.., alpha = ..level..),
-                 size = 0.01, bins = 40, geom = 'polygon') +
-  scale_fill_viridis() +
-  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
-  mapTheme(title_size = 14) + theme(legend.position = "none")
+#ride.panel <- 
+ # ride.panel %>% 
+  #  arrange(na.omit(EMS_net_res), interval60) %>% 
+   # group_by(Pickup.Census.Tract) %>% 
+    #mutate(lagHour = dplyr::lag(Trip_Count,1),
+     #      lag2Hours = dplyr::lag(Trip_Count,2),
+      #     lag3Hours = dplyr::lag(Trip_Count,3),
+       #    lag4Hours = dplyr::lag(Trip_Count,4),
+        #   lag12Hours = dplyr::lag(Trip_Count,12),
+         #  lag1day = dplyr::lag(Trip_Count,24)) %>% 
+#   ungroup()
+```
+
+```{r combine census info with fishnet}
+
+EMS_net_res <- st_transform(EMS_net_res,st_crs(SanMon_Census))
+
+fishnet_all <-
+  st_join(EMS_net_res,SanMon_Census) 
+
+fishnet_all <-
+  st_join(fishnet_all, SanMon_Crime)
+
+fishnet_all <-
+  left_join(fishnet_all,weather.Panel)
+```
+
+```{r Regression}
+#Split Testing and Training Sets
+ride.Train <- filter(fishnet_all, week < 35)
+ride.Test <- filter(fishnet_all, week >= 35)
+
+#See Pickupby week
+group_by(ride.Train, week, uniqueID) %>%
+  summarize(countEMS = sum(countEMS)) %>%
+  ungroup() %>% 
+  ggplot() + geom_sf(data = SanMon_Bound, fill="grey50") + geom_sf(aes(fill = countEMS)) +
+    facet_wrap(~week, ncol = 8) +
+    scale_fill_viridis_b(name = "EMS Call Count") +
+    labs(title="Sum of calls by fishnet by week") +
+    mapTheme() + theme(legend.position = "bottom") 
+
+```
+
+```{r week lag}
+str(fishnet_all)
+
+study.panel <- 
+  expand.grid(interval60=unique(fishnet_all$interval60), 
+              uniqueID = unique(fishnet_all$uniqueID)) %>%
+  left_join(., fishnet_all %>%
+              select(uniqueID, map_point.latitude.x, map_point.longitude.x)%>%
+              distinct() %>%
+              group_by(uniqueID) %>%
+              slice(1))
 ```
 
