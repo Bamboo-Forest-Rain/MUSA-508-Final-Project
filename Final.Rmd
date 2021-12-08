@@ -140,7 +140,7 @@ SanMon_Census <-
 SanMonTracts <- 
   SanMon_Census %>%
   as.data.frame() %>%
-  distinct(GEOID, .keest_crsp_all = TRUE) %>%
+  distinct(GEOID, .keep_all = TRUE) %>%
   select(GEOID, geometry) %>% 
   st_sf
 ```
@@ -152,9 +152,9 @@ SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$wh
 SanMon_Crime <- 
   SanMon_Crime %>% na.omit()%>%
   filter(longitude != "0.0")%>%
-  st_as_sf(coords = c("longitude","latitude"),agr = "constant")
+  st_as_sf(coords = c("longitude","latitude"),crs=4326,agr = "constant")
   
-SanMon_Crime <- st_set_crs(SanMon_Crime,4326) %>%
+SanMon_Crime <- SanMon_Crime %>% 
   select(geometry, ucr)%>%
   st_transform(st_crs(Fire_call))
 
@@ -176,6 +176,7 @@ aggr(Fire_call, prop = F, number = T)
 Fire_call <- na.omit(Fire_call)
 Fire_call <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs=4326
                                         ,agr = "constant")
+Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
