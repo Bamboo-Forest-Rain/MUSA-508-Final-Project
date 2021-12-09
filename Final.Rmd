@@ -436,12 +436,12 @@ DAT_map <-
 #Manually add quantile
 DAT_map <-
   DAT_map %>%
-  mutate(quantile = case_when(n > 0 & n < 20 ~ "0 - 19",
-                              n >= 20 & n < 40 ~ "20 - 39",
-                              n >= 40 & n < 60 ~ "40 - 59",
-                              n >= 60 & n < 80 ~ "60 - 79",
-                              n >= 80 & n < 100 ~ "80 - 99",
-                              n >= 100 ~ "99 +"))
+  mutate(quantile = case_when(average.day > 0 & average.day < 20 ~ "1 - 19",
+                              average.day >= 20 & average.day < 40 ~ "20 - 39",
+                              average.day >= 40 & average.day < 60 ~ "40 - 59",
+                              average.day >= 60 & average.day < 80 ~ "60 - 79",
+                              average.day >= 80 & average.day < 100 ~ "80 - 99",
+                              average.day >= 100 ~ "99 +"))
   
 ggplot()+
   geom_sf(data = SanMon_Bound) +
@@ -452,42 +452,6 @@ ggplot()+
   labs(title="EMS calls per fishnet by time and day",
        subtitle = "March to November, 2021",
        fill = "EMS calls")+
-  mapTheme()
-```
-
-```{r}
-fishnet_all <-               
-fishnet_all %>% 
-            mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
-                                    "Weekday"),
-                time_of_day = case_when(
-                                 hour(interval60) >= 6 & hour(interval60) < 12 ~  
-                                "Morning to noon",
-                                 hour(interval60) >= 12 & hour(interval60) < 18 ~ 
-                                "Afternoon",
-                                 hour(interval60) >= 18 & hour(interval60) <= 23 ~
-                                "Evening",
-                                hour(interval60) >= 0 & hour(interval60) < 6 ~
-                                "Overnight")) %>%
-  group_by(uniqueID, weekend, time_of_day) %>%
-              tally()
-fishnet_all <-
-  fishnet_all %>%
-  mutate(average.day = case_when(weekend == "Weekend" ~ n/2,
-                                 weekend =="Weekday" ~ n/5))
-
-fishnet_all <-
-  fishnet_all %>%
-  na.omit()
-
-ggplot()+
-  geom_sf(data = SanMon_Bound) +
-  geom_sf(data = DAT_map,
-            aes(fill = q5(average.day))) +
-  scale_fill_brewer(palette = "YlGnBu",direction = 1)+
-  facet_grid(weekend ~ time_of_day)+
-  labs(title="EMS calls per by fishnet",
-       subtitle = "March to September, 2021")+
   mapTheme()
 ```
 
