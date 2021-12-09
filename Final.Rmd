@@ -171,11 +171,7 @@ SanMon_Crime <-
   st_as_sf(coords = c("longitude","latitude"),crs=4326,agr = "constant")
   
 SanMon_Crime <- SanMon_Crime %>% 
-  select(geometry, ucr)%>%
-  st_transform(st_crs(Fire_call)) 
-
-Fire_call <- 
-  st_join(Fire_call,SanMon_Crime) #In Fishnet not in call. 
+  select(geometry, ucr)
  
 ```
 
@@ -248,17 +244,15 @@ EMS_net <-
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
-EMS_net_crime <- 
-  dplyr::select(Fire_call) %>% na.omit()%>%
-  mutate(countCrime = 1) %>% 
-  aggregate(., fishnet, sum) %>%
-  mutate(countCrime = replace_na(countCrime, 0),
-         uniqueID = rownames(.),
-         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
-  select(geometry,countCrime)
+#EMS_net_crime <- 
+ # dplyr::select(Fire_call) %>% na.omit()%>%
+  #mutate(countCrime = 1) %>% 
+  #aggregate(., fishnet, sum) %>%
+  #mutate(countCrime = replace_na(countCrime, 0),
+    #     uniqueID = rownames(.),
+     #    cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
+  #select(geometry,countCrime)
 
-EMS_net <-
-  st_join(EMS_net,EMS_net_crime)
 
 EMS_net_res <-
   st_join(EMS_net,Fire_call)%>%
@@ -302,23 +296,23 @@ ggplot(fishnet_all %>%
 
 
 ```{r Kernal Density}
-EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
-EMS_KD <- density.ppp(EMS_ppp, 2)
+#EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
+#EMS_KD <- density.ppp(EMS_ppp, 2)
 
-Fire_call_geo <-
-  Fire_call_geo %>%
-  st_transform('ESRI:102271') 
+#Fire_call_geo <-
+#  Fire_call_geo %>%
+  #st_transform('ESRI:102271') 
 
-EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
-  aggregate(., fishnet, mean) %>%
-  mutate(label = "Kernel Density",
-         EMS_Demand = ntile(value, 300)) %>%
-  cbind(
-    aggregate(
-      dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
-    mutate(EMSCount = replace_na(EMSCount, 0))) %>%
-  dplyr::select(label, EMS_Demand, EMSCount)
+#EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
+ # st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
+  #aggregate(., fishnet, mean) %>%
+  #mutate(label = "Kernel Density",
+   #      EMS_Demand = ntile(value, 300)) %>%
+  #cbind(
+   # aggregate(
+    #  dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
+    #mutate(EMSCount = replace_na(EMSCount, 0))) %>%
+ # dplyr::select(label, EMS_Demand, EMSCount)
 
 ggplot()+
   geom_sf(data = EMS_KDE_sf,aes(fill = EMS_Demand), colour = NA) +
@@ -376,11 +370,9 @@ fishnet_all <-
 fishnet_all <-
   left_join(fishnet_all,weather.Panel)
 
-str(fishnet_all)
-
 fishnet_all <-
   fishnet_all %>%
-  select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
+  select(countEMS,uniqueID,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 ```
 
 ```{r Distance to Bars and Pubs}
@@ -427,9 +419,39 @@ mutate(school.nn = nn_function(st_c(st_coid(fishnet_all)),st_c(st_coid(school.sf
 fishnet_all <-
   fishnet_all %>% 
 mutate(school_dist= st_distance(st_coid(fishnet_all),st_coid(school.sf)))
-
-st_crs(fishnet_all)
 ```
+
+```{r Crime in fishnet}
+
+#Add Crime to Fishnet
+
+SanMon_Crime <- 
+  SanMon_Crime %>%
+  st_transform(st_crs(fishnet))
+
+fishnet_Crime <-
+  st_join(SanMon_Crime,fishnet) %>%
+  mutate(countCrime = 1)
+
+fishnet_Crime <-
+  fishnet_Crime %>%
+  st_transform(st_crs(fishnet_all))%>%
+  select(geometry,countCrime)
+
+fishnet_all <-
+  st_join(fishnet_all, fishnet_Crime)
+
+fishnet_all$countCrime[is.na(fishnet_all$countCrime)] <- 0
+
+str(fishnet_all)
+
+fishnet_all <-
+  fishnet_all %>%
+  group_by(uniqueID)%>%
+  mutate(countCrime2 = sum(countCrime))%>%
+  ungroup
+```
+
 
 ```{r Regression}
 #Split Testing and Training Sets
