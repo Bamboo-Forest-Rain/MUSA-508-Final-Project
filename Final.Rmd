@@ -164,6 +164,7 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
+
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
   filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description)) 
@@ -293,6 +294,16 @@ ggplot() +
   mapTheme()
 ```
 
+```{r trip_timeseries }
+ggplot(fishnet_all %>%
+         group_by(interval60) %>%
+         tally())+
+  geom_line(aes(x = interval60, y = n))+
+  labs(title="Bike share trips per hr. Boston, August and September, 2019",
+       x="Date", 
+       y="Number of trips", caption = "Fig 2")+
+  plotTheme()
+```
 
 
 ```{r Kernal Density}
@@ -439,6 +450,8 @@ reg1 <-
 reg2 <- 
   lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature, data=ride.Train)
 
+summary(reg1)
+summary(reg2)
 ```
 
 ```{r}
@@ -486,3 +499,5 @@ week_predictions %>%
     labs(title = "Mean Absolute Errors by model specification and week", caption = "Fig 8") +
   plotTheme()
 ```
+
+
