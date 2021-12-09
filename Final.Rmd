@@ -160,6 +160,15 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
+```{r Call by Day of the week}
+ggplot(Fire_call %>% mutate(hour = hour(received)))+
+     geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
+  labs(title="EMS Calls by Day of the Week March to September",
+       x="Hour", 
+       y="Trip Counts", caption = "Fig 4")+
+     plotTheme()
+```
+
 
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
@@ -482,6 +491,7 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
       #        group_by(uniqueID) %>%
        #       slice(1))
 ```
+
 ```{r Correlation}
 
 #Plots to look at correlations between interested variables
