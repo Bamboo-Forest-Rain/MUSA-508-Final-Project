@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 
 ```{r library and functions haha}
+library(osmdata)
 library(tidyverse)
 library(sf)
 library(lubridate)
@@ -142,8 +143,8 @@ SanMonTracts <-
   distinct(GEOID, .keep_all = TRUE) %>%
   select(GEOID, geometry) %>% 
   st_sf
-```
 
+```
 
 The NAs are mainly in location, which can only be omited for later process.
 ```{r}
@@ -160,6 +161,7 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
+
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
   filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description)) 
@@ -170,11 +172,15 @@ SanMon_Crime <-
   st_as_sf(coords = c("longitude","latitude"),crs=4326,agr = "constant")
   
 SanMon_Crime <- SanMon_Crime %>% 
+<<<<<<< HEAD
   select(geometry, ucr)%>%
   st_transform(st_crs(Fire_call))
 
 Fire_call <- 
   st_join(Fire_call,SanMon_Crime)
+=======
+  select(geometry, ucr)
+>>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
  
 ```
 
@@ -237,6 +243,7 @@ fishnet <- fishnet[SanMon_Bound,]
 fishnet <-st_transform(fishnet, st_crs(Fire_call))
 ```
 
+
 ```{r Call Count}
 EMS_net <- 
   dplyr::select(Fire_call) %>% 
@@ -246,17 +253,15 @@ EMS_net <-
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
-EMS_net_crime <- 
-  dplyr::select(Fire_call) %>% na.omit()%>%
-  mutate(countCrime = 1) %>% 
-  aggregate(., fishnet, sum) %>%
-  mutate(countCrime = replace_na(countCrime, 0),
-         uniqueID = rownames(.),
-         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
-  select(geometry,countCrime)
+#EMS_net_crime <- 
+ # dplyr::select(Fire_call) %>% na.omit()%>%
+  #mutate(countCrime = 1) %>% 
+  #aggregate(., fishnet, sum) %>%
+  #mutate(countCrime = replace_na(countCrime, 0),
+    #     uniqueID = rownames(.),
+     #    cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
+  #select(geometry,countCrime)
 
-EMS_net <-
-  st_join(EMS_net,EMS_net_crime)
 
 EMS_net_res <-
   st_join(EMS_net,Fire_call)%>%
@@ -287,26 +292,36 @@ ggplot() +
   mapTheme()
 ```
 
+```{r trip_timeseries }
+ggplot(fishnet_all %>%
+         group_by(interval60) %>%
+         tally())+
+  geom_line(aes(x = interval60, y = n))+
+  labs(title="Bike share trips per hr. Boston, August and September, 2019",
+       x="Date", 
+       y="Number of trips", caption = "Fig 2")+
+  plotTheme()
+```
 
 
 ```{r Kernal Density}
-EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
-EMS_KD <- density.ppp(EMS_ppp, 2)
+#EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
+#EMS_KD <- density.ppp(EMS_ppp, 2)
 
-Fire_call_geo <-
-  Fire_call_geo %>%
-  st_transform('ESRI:102271') 
+#Fire_call_geo <-
+#  Fire_call_geo %>%
+  #st_transform('ESRI:102271') 
 
-EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
-  aggregate(., fishnet, mean) %>%
-  mutate(label = "Kernel Density",
-         EMS_Demand = ntile(value, 300)) %>%
-  cbind(
-    aggregate(
-      dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
-    mutate(EMSCount = replace_na(EMSCount, 0))) %>%
-  dplyr::select(label, EMS_Demand, EMSCount)
+#EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
+ # st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
+  #aggregate(., fishnet, mean) %>%
+  #mutate(label = "Kernel Density",
+   #      EMS_Demand = ntile(value, 300)) %>%
+  #cbind(
+   # aggregate(
+    #  dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
+    #mutate(EMSCount = replace_na(EMSCount, 0))) %>%
+ # dplyr::select(label, EMS_Demand, EMSCount)
 
 ggplot()+
   geom_sf(data = EMS_KDE_sf,aes(fill = EMS_Demand), colour = NA) +
@@ -364,10 +379,84 @@ fishnet_all <-
 fishnet_all <-
   left_join(fishnet_all,weather.Panel)
 
+fishnet_all <-
+  fishnet_all %>%
+  select(countEMS,uniqueID,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
+```
+
+```{r Distance to Bars and Pubs}
+st_c <- st_coordinates
+st_coid <- st_centroid
+
+Bars <- st_read("Pubs and Bars.kml") %>%
+  st_transform(st_crs(fishnet_all)) %>%
+  st_zm() #Drop_Z_dimension
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(bars.nn = nn_function(st_c(st_coid(fishnet_all)), st_c(Bars),3))
+```
+```{r Distance to Downtown}
+#DownTown Santa Monica and Distance
+SanMon_Town <-
+  st_read("Downtown Santa Monica.kml")%>%
+  st_transform(st_crs(fishnet_all))
+
+fishnet_all <- 
+  fishnet_all %>%
+  mutate(DowntownDistance = as.numeric(st_distance(st_coid(fishnet_all),SanMon_Town, by_element = TRUE)))
+```
+
+```{r Schools}
+#Using OpenStreetMap 
+# Schools
+q0 <- opq(bbox = c(-118.553468,33.966658,-118.443426,34.05056)) #Bounding Box of Santa Monica
+
+school <- add_osm_feature(opq = q0, key = 'amenity', value = "school") %>%
+  osmdata_sf(.)
+
+school.sf <- st_geometry(school$osm_polygons) %>%
+  st_transform(st_crs(fishnet_all)) %>%
+  st_sf() %>%
+  cbind(., school$osm_polygons$name) %>%
+  rename(NAME = school.osm_polygons.name)
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(school.nn = nn_function(st_c(st_coid(fishnet_all)),st_c(st_coid(school.sf)),3))
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(school_dist= st_distance(st_coid(fishnet_all),st_coid(school.sf)))
+```
+
+```{r Crime in fishnet}
+
+#Add Crime to Fishnet
+
+SanMon_Crime <- 
+  SanMon_Crime %>%
+  st_transform(st_crs(fishnet))
+
+fishnet_Crime <-
+  st_join(SanMon_Crime,fishnet) %>%
+  mutate(countCrime = 1)
+
+fishnet_Crime <-
+  fishnet_Crime %>%
+  st_transform(st_crs(fishnet_all))%>%
+  select(geometry,countCrime)
+
+fishnet_all <-
+  st_join(fishnet_all, fishnet_Crime)
+
+fishnet_all$countCrime[is.na(fishnet_all$countCrime)] <- 0
+
 str(fishnet_all)
 
 fishnet_all <-
   fishnet_all %>%
+<<<<<<< HEAD
   select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 
 
@@ -379,6 +468,15 @@ plot(cor_plot,pch=19,col=rgb(0,0,100,50,maxColorValue=255))
 ```
 
 ```{r Regression, fig.height=9, fig.width=8}
+=======
+  group_by(uniqueID)%>%
+  mutate(countCrime2 = sum(countCrime))%>%
+  ungroup
+```
+
+
+```{r Regression}
+>>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
 #Split Testing and Training Sets
 ride.Train <- filter(fishnet_all, week < 35)
 ride.Test <- filter(fishnet_all, week >= 35)
@@ -441,6 +539,8 @@ reg1 <-
 reg2 <- 
   lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature, data=ride.Train)
 
+summary(reg1)
+summary(reg2)
 ```
 
 ```{r}
@@ -490,6 +590,7 @@ week_predictions %>%
 ```
 
 
+<<<<<<< HEAD
 ```{r}
 # correlation 
 cor_plot <-   st_drop_geometry(fishnet_all) %>%
@@ -511,3 +612,5 @@ correlation.long %>% gf_histogram(..count.. ~ Value) %>% gf_facet_grid(Variable 
 
 ```
 
+=======
+>>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
