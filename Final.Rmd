@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 
 ```{r library and functions haha}
+library(osmdata)
 library(tidyverse)
 library(sf)
 library(lubridate)
@@ -86,11 +87,6 @@ census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE)
 Fire_call <- read.socrata("https://data.smgov.net/resource/5y3u-5db4.json?$where=incident_date between '2021-03-01' and '2021-11-30'&call_type_description=Emergency Medical Service (EMS)")
 
 Fire_call <- Fire_call %>%
-  st_as_sf(coords = c("longitude","latitude"), crs = 4326, arg ="constant")
-
-write.csv(Fire_call,"Fire Call.csv")
-
-Fire_call <- Fire_call %>%
   mutate(interval60 = floor_date(ymd_hms(received), unit = "hour"),
          interval15 = floor_date(ymd_hms(received), unit = "15 mins"),
          week = week(interval60),
@@ -146,8 +142,8 @@ SanMonTracts <-
   distinct(GEOID, .keep_all = TRUE) %>%
   select(GEOID, geometry) %>% 
   st_sf
-```
 
+```
 
 The NAs are mainly in location, which can only be omited for later process.
 ```{r}
@@ -176,12 +172,10 @@ SanMon_Crime <-
   
 SanMon_Crime <- SanMon_Crime %>% 
   select(geometry, ucr)%>%
-  st_transform(st_crs(Fire_call))
+  st_transform(st_crs(Fire_call)) 
 
 Fire_call <- 
-  st_join(Fire_call,SanMon_Crime)
- 
-write.csv(SanMon_Crime, "Crime.csv")
+  st_join(Fire_call,SanMon_Crime) #In Fishnet not in call. 
  
 ```
 
@@ -243,6 +237,7 @@ fishnet <- fishnet[SanMon_Bound,]
 
 fishnet <-st_transform(fishnet, st_crs(Fire_call))
 ```
+
 
 ```{r Call Count}
 EMS_net <- 
@@ -386,6 +381,54 @@ str(fishnet_all)
 fishnet_all <-
   fishnet_all %>%
   select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
+```
+
+```{r Distance to Bars and Pubs}
+st_c <- st_coordinates
+st_coid <- st_centroid
+
+Bars <- st_read("Pubs and Bars.kml") %>%
+  st_transform(st_crs(fishnet_all)) %>%
+  st_zm() #Drop_Z_dimension
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(bars.nn = nn_function(st_c(st_coid(fishnet_all)), st_c(Bars),3))
+```
+```{r Distance to Downtown}
+#DownTown Santa Monica and Distance
+SanMon_Town <-
+  st_read("Downtown Santa Monica.kml")%>%
+  st_transform(st_crs(fishnet_all))
+
+fishnet_all <- 
+  fishnet_all %>%
+  mutate(DowntownDistance = as.numeric(st_distance(st_coid(fishnet_all),SanMon_Town, by_element = TRUE)))
+```
+
+```{r Schools}
+#Using OpenStreetMap 
+# Schools
+q0 <- opq(bbox = c(-118.553468,33.966658,-118.443426,34.05056)) #Bounding Box of Santa Monica
+
+school <- add_osm_feature(opq = q0, key = 'amenity', value = "school") %>%
+  osmdata_sf(.)
+
+school.sf <- st_geometry(school$osm_polygons) %>%
+  st_transform(st_crs(fishnet_all)) %>%
+  st_sf() %>%
+  cbind(., school$osm_polygons$name) %>%
+  rename(NAME = school.osm_polygons.name)
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(school.nn = nn_function(st_c(st_coid(fishnet_all)),st_c(st_coid(school.sf)),3))
+
+fishnet_all <-
+  fishnet_all %>% 
+mutate(school_dist= st_distance(st_coid(fishnet_all),st_coid(school.sf)))
+
+st_crs(fishnet_all)
 ```
 
 ```{r Regression}
