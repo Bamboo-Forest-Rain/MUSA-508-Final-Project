@@ -31,6 +31,7 @@ library(RSocrata)
 library(FNN)
 library(spdep)
 library(spatstat)
+library(RColorBrewer)
 #library(VIM) # check NAs
 
 plotTheme <- theme(
@@ -161,14 +162,27 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 ```
 
 ```{r Call by Day of the week}
+#Add call per hour by day of the week 
 ggplot(Fire_call %>% mutate(hour = hour(received)))+
      geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
-  labs(title="EMS Calls by Day of the Week March to September",
+  labs(title="EMS Calls by Day of the Week March to November",
        x="Hour", 
-       y="Trip Counts", caption = "Fig 4")+
+       y="EMS Call Counts")+
      plotTheme()
 ```
 
+```{r Comparsion between weekday and weekend}
+
+ggplot(Fire_call %>% 
+         mutate(hour = hour(received),
+                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday")))+
+     geom_freqpoly(aes(hour, color = weekend), binwidth = 1)+
+  labs(title="EMS call - weekend vs weekday, March\n and November, 2021",
+       x="Hour", 
+       y="EMS Call Count", caption = "Fig 5")+
+     plotTheme()
+
+```
 
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
@@ -384,6 +398,37 @@ fishnet_all <-
   select(countEMS,uniqueID,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 ```
 
+#Time-related Variables
+```{r Call by Fishnet Time Separated}
+DAT_map <-               
+fishnet_all %>% 
+            mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
+                                    "Weekday"),
+                time_of_day = case_when(
+                                 hour(interval60) >= 7 & hour(interval60) < 12 ~  
+                                "Morning to noon",
+                                 hour(interval60) >= 12 & hour(interval60) < 17 ~ 
+                                "Afternoon",
+                                 hour(interval60) >= 17 & hour(interval60) < 22 ~
+                                "Evening",
+                                hour(interval60) >= 22 & hour(interval60) <= 6 ~
+                                "Overnight")) %>%
+  group_by(uniqueID, weekend, time_of_day) %>%
+              tally()
+DAT_map <-
+  DAT_map %>%
+  na.omit()
+
+ggplot()+
+  geom_sf(data = DAT_map,
+            aes(fill = q5(n))) +
+  scale_fill_brewer(palette = "BuPu",direction = 1,label = c(0,))+
+  facet_grid(weekend ~ time_of_day)+
+  labs(title="EMS call per hr by fishnet. March to September, 2021")+
+  mapTheme()
+```
+
+
 ```{r Distance to Bars and Pubs}
 st_c <- st_coordinates
 st_coid <- st_centroid
@@ -396,6 +441,7 @@ fishnet_all <-
   fishnet_all %>% 
 mutate(bars.nn = nn_function(st_c(st_coid(fishnet_all)), st_c(Bars),3))
 ```
+
 ```{r Distance to Downtown}
 #DownTown Santa Monica and Distance
 SanMon_Town <-
@@ -461,6 +507,19 @@ fishnet_all <-
   ungroup
 ```
 
+```{r }
+DAT_Map <-               
+fishnet_all %>% 
+            mutate(hour = hour(received),
+                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"),
+                time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
+  group_by(start.station.id, start.station.latitude, start.station.longitude, weekend, time_of_day) %>%
+              tally() %>%
+  st_as_sf(coords = c("start.station.longitude", "start.station.latitude"), crs = "EPSG:4269") 
+```
 
 ```{r Regression}
 #Split Testing and Training Sets
