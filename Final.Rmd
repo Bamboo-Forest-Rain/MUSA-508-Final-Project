@@ -407,7 +407,7 @@ fishnet_all <-
   select(countEMS,uniqueID,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 ```
 
-#Time-related Variables
+# Time-related Variables
 ```{r Call by Fishnet Time Separated, fig.height=4, fig.width=6}
 DAT_map <-               
 fishnet_all %>% 
@@ -433,6 +433,53 @@ DAT_map <-
   DAT_map %>%
   na.omit()
 
+#Manually add quantile
+DAT_map <-
+  DAT_map %>%
+  mutate(quantile = case_when(n > 0 & n < 20 ~ "0 - 19",
+                              n >= 20 & n < 40 ~ "20 - 39",
+                              n >= 40 & n < 60 ~ "40 - 59",
+                              n >= 60 & n < 80 ~ "60 - 79",
+                              n >= 80 & n < 100 ~ "80 - 99",
+                              n >= 100 ~ "99 +"))
+  
+ggplot()+
+  geom_sf(data = SanMon_Bound) +
+  geom_sf(data = DAT_map,
+            aes(fill = quantile)) +
+  scale_fill_brewer(palette = "YlGnBu",direction = 1)+
+  facet_grid(weekend ~ time_of_day)+
+  labs(title="EMS calls per fishnet by time and day",
+       subtitle = "March to November, 2021",
+       fill = "EMS calls")+
+  mapTheme()
+```
+
+```{r}
+fishnet_all <-               
+fishnet_all %>% 
+            mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
+                                    "Weekday"),
+                time_of_day = case_when(
+                                 hour(interval60) >= 6 & hour(interval60) < 12 ~  
+                                "Morning to noon",
+                                 hour(interval60) >= 12 & hour(interval60) < 18 ~ 
+                                "Afternoon",
+                                 hour(interval60) >= 18 & hour(interval60) <= 23 ~
+                                "Evening",
+                                hour(interval60) >= 0 & hour(interval60) < 6 ~
+                                "Overnight")) %>%
+  group_by(uniqueID, weekend, time_of_day) %>%
+              tally()
+fishnet_all <-
+  fishnet_all %>%
+  mutate(average.day = case_when(weekend == "Weekend" ~ n/2,
+                                 weekend =="Weekday" ~ n/5))
+
+fishnet_all <-
+  fishnet_all %>%
+  na.omit()
+
 ggplot()+
   geom_sf(data = SanMon_Bound) +
   geom_sf(data = DAT_map,
@@ -444,6 +491,7 @@ ggplot()+
   mapTheme()
 ```
 
+# Geographic related variable
 
 ```{r Distance to Bars and Pubs}
 st_c <- st_coordinates
@@ -535,19 +583,6 @@ plot(cor_plot,pch=19,col=rgb(0,0,100,50,maxColorValue=255))
   ungroup
 ```
 
-```{r }
-DAT_Map <-               
-fishnet_all %>% 
-            mutate(hour = hour(received),
-                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"),
-                time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
-  group_by(start.station.id, start.station.latitude, start.station.longitude, weekend, time_of_day) %>%
-              tally() %>%
-  st_as_sf(coords = c("start.station.longitude", "start.station.latitude"), crs = "EPSG:4269") 
-```
 
 ```{r Regression}
 #Split Testing and Training Sets
@@ -602,6 +637,19 @@ ggplot(correlation.long, aes(Value, countEMS)) +
   facet_wrap(~Variable, ncol = 2, scales = "free") +
   labs(title = "Burglary count as a function of risk factors") +
   plotTheme()
+```
+
+```{r}
+# Histogram for every variable, including y
+correlation.long_all <-
+  st_drop_geometry(fishnet_all) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw) %>%
+    gather(Variable, Value)
+
+
+ggplot(correlation.long_all, aes(Value)) + 
+    geom_histogram(bins = 30) + 
+    facet_wrap(~Variable, scales = 'free')
 
 ```
 
