@@ -411,18 +411,24 @@ fishnet_all %>%
                                 "Afternoon",
                                  hour(interval60) >= 17 & hour(interval60) < 22 ~
                                 "Evening",
-                                hour(interval60) >= 22 & hour(interval60) <= 6 ~
+                                hour(interval60) >= 22 & hour(interval60) < 7 ~
                                 "Overnight")) %>%
   group_by(uniqueID, weekend, time_of_day) %>%
               tally()
 DAT_map <-
   DAT_map %>%
+  mutate(average.day = case_when(weekend == "Weekend" ~ n/2,
+                                 weekend =="Weekday" ~ n/5))
+
+DAT_map <-
+  DAT_map %>%
   na.omit()
 
 ggplot()+
+  geom_sf(data = SanMon_Bound) +
   geom_sf(data = DAT_map,
-            aes(fill = q5(n))) +
-  scale_fill_brewer(palette = "BuPu",direction = 1,label = c(0,))+
+            aes(fill = q5(average.day))) +
+  scale_fill_brewer(palette = "BuPu",direction = 1)+
   facet_grid(weekend ~ time_of_day)+
   labs(title="EMS call per hr by fishnet. March to September, 2021")+
   mapTheme()
