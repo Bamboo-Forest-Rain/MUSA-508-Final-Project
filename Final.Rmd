@@ -31,6 +31,7 @@ library(RSocrata)
 library(FNN)
 library(spdep)
 library(spatstat)
+library(RColorBrewer)
 #library(VIM) # check NAs
 library(ggformula)
 
@@ -161,6 +162,28 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
+```{r Call by Day of the week}
+#Add call per hour by day of the week 
+ggplot(Fire_call %>% mutate(hour = hour(received)))+
+     geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
+  labs(title="EMS Calls by Day of the Week March to November",
+       x="Hour", 
+       y="EMS Call Counts")+
+     plotTheme()
+```
+
+```{r Comparsion between weekday and weekend}
+
+ggplot(Fire_call %>% 
+         mutate(hour = hour(received),
+                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday")))+
+     geom_freqpoly(aes(hour, color = weekend), binwidth = 1)+
+  labs(title="EMS call - weekend vs weekday, March\n and November, 2021",
+       x="Hour", 
+       y="EMS Call Count", caption = "Fig 5")+
+     plotTheme()
+
+```
 
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
@@ -384,6 +407,44 @@ fishnet_all <-
   select(countEMS,uniqueID,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
 ```
 
+#Time-related Variables
+```{r Call by Fishnet Time Separated, fig.height=4, fig.width=6}
+DAT_map <-               
+fishnet_all %>% 
+            mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
+                                    "Weekday"),
+                time_of_day = case_when(
+                                 hour(interval60) >= 6 & hour(interval60) < 12 ~  
+                                "Morning to noon",
+                                 hour(interval60) >= 12 & hour(interval60) < 18 ~ 
+                                "Afternoon",
+                                 hour(interval60) >= 18 & hour(interval60) <= 23 ~
+                                "Evening",
+                                hour(interval60) >= 0 & hour(interval60) < 6 ~
+                                "Overnight")) %>%
+  group_by(uniqueID, weekend, time_of_day) %>%
+              tally()
+DAT_map <-
+  DAT_map %>%
+  mutate(average.day = case_when(weekend == "Weekend" ~ n/2,
+                                 weekend =="Weekday" ~ n/5))
+
+DAT_map <-
+  DAT_map %>%
+  na.omit()
+
+ggplot()+
+  geom_sf(data = SanMon_Bound) +
+  geom_sf(data = DAT_map,
+            aes(fill = q5(average.day))) +
+  scale_fill_brewer(palette = "YlGnBu",direction = 1)+
+  facet_grid(weekend ~ time_of_day)+
+  labs(title="EMS calls per by fishnet",
+       subtitle = "March to September, 2021")+
+  mapTheme()
+```
+
+
 ```{r Distance to Bars and Pubs}
 st_c <- st_coordinates
 st_coid <- st_centroid
@@ -396,6 +457,7 @@ fishnet_all <-
   fishnet_all %>% 
 mutate(bars.nn = nn_function(st_c(st_coid(fishnet_all)), st_c(Bars),3))
 ```
+
 ```{r Distance to Downtown}
 #DownTown Santa Monica and Distance
 SanMon_Town <-
@@ -468,15 +530,26 @@ plot(cor_plot,pch=19,col=rgb(0,0,100,50,maxColorValue=255))
 ```
 
 ```{r Regression, fig.height=9, fig.width=8}
-=======
   group_by(uniqueID)%>%
   mutate(countCrime2 = sum(countCrime))%>%
   ungroup
 ```
 
+```{r }
+DAT_Map <-               
+fishnet_all %>% 
+            mutate(hour = hour(received),
+                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"),
+                time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
+  group_by(start.station.id, start.station.latitude, start.station.longitude, weekend, time_of_day) %>%
+              tally() %>%
+  st_as_sf(coords = c("start.station.longitude", "start.station.latitude"), crs = "EPSG:4269") 
+```
 
 ```{r Regression}
->>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
 #Split Testing and Training Sets
 ride.Train <- filter(fishnet_all, week < 35)
 ride.Test <- filter(fishnet_all, week >= 35)
@@ -506,7 +579,9 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
        #       slice(1))
 ```
 
+<<<<<<< HEAD
 ```{r Correlation, fig.height=18, fig.width=8}
+
 
 #Plots to look at correlations between interested variables
 correlation.long <-
@@ -590,27 +665,16 @@ week_predictions %>%
 ```
 
 
-<<<<<<< HEAD
 ```{r}
-# correlation 
-cor_plot <-   st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw,-interval60,-month,-week) %>% na.omit()# %>% 
-    cor()
-
-    
-gsub('["]', '', colnames(cor_plot))
+# Histogram for every variable, inclufing y
+correlation.long_all <-
+  st_drop_geometry(fishnet_all) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw) %>%
+    gather(Variable, Value)
 
 
-plot(cor_plot,pch=19,col=rgb(0,0,100,50,maxColorValue=255))
-
-for ( i in colnames(cor_plot)) {
-  hist(cor_plot$i)
-}
-
-correlation.long %>% gf_histogram(..count.. ~ Value) %>% gf_facet_grid(Variable ~ .)
-
+ggplot(correlation.long_all, aes(Value)) + 
+    geom_histogram(bins = 30) + 
+    facet_wrap(~Variable, scales = 'free')
 
 ```
-
-=======
->>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
