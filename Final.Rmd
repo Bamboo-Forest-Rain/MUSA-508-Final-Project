@@ -604,12 +604,10 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
 ```
 
 ```{r Correlation, fig.height=18, fig.width=8}
-
-
 #Plots to look at correlations between interested variables
 correlation.long <-
   st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day,-week,-Temperature) %>%
     gather(Variable, Value, -countEMS)
 
 correlation.cor <-
@@ -625,21 +623,6 @@ ggplot(correlation.long, aes(Value, countEMS)) +
   facet_wrap(~Variable, ncol = 2, scales = "free") +
   labs(title = "Burglary count as a function of risk factors") +
   plotTheme()
-```
-
-```{r}
-# Histogram for every variable, including y
-str(fishnet_all)
-
-fishnet_all %>%
-    dplyr::select(countEMS, time_of_day) %>%
-      ggplot(., aes(x=time_of_day,y=countEMS)) +   
-        geom_bar(position = "dodge", stat="identity") +
-        labs(x="Time of the Day", y="countEMS",
-             title = "EMS count associated with time of the day",
-             subtitle = "Categorical features") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 ```
 
 ```{r}
@@ -664,10 +647,10 @@ ggplot(correlation.long_all, aes(Value)) +
 
 #Add Regressions
 reg1 <- 
-    lm(countEMS ~  Age_above60 + Age_below10 + Med_Inc + countCrime, data=ride.Train)
+    lm(countEMS ~  Age_above60 + Age_below10 + Med_Inc, data=ride.Train)
 
 reg2 <- 
-  lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature + DowntownDistance + bars.nn + school.nn + dotw + time_of_day, data=ride.Train)
+  lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + DowntownDistance + bars.nn + school.nn + dotw + time_of_day, data=ride.Train)
 
 summary(reg1)
 summary(reg2)
@@ -697,7 +680,7 @@ model_pred <- function(dat, fit){
 week_predictions <- 
   ride.Test.weekNest %>% 
     mutate(OnlySocial = map(.x = data, fit = reg1, .f = model_pred),
-           SocialwithDistance = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
+          SocialwithGeo = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
     mutate(Observed = map(data, pull, countEMS),
            Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
@@ -722,14 +705,114 @@ week_predictions %>%
 
 ```{r}
 # Histogram for every variable, inclufing y
-correlation.long_all <-
+correlation.long <-
   st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw) %>%
-    gather(Variable, Value)
+    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day,-week,-Temperature) %>%
+    gather(Variable, Value, -countEMS)
 
 
 ggplot(correlation.long_all, aes(Value)) + 
     geom_histogram(bins = 30) + 
     facet_wrap(~Variable, scales = 'free')
+
+```
+```{r K-Fold, message = FALSE}
+
+#Mutate hour (0-23)
+fishnet_all <-
+  fishnet_all %>%
+  mutate(hour=hour(interval60))
+
+#Add variables
+reg.vars <-
+  c("hour","Age_above60","Age_below10", "Med_Inc" , "countCrime" , "DowntownDistance" , "bars.nn" , "school.nn", "dotw", "time_of_day")
+
+#Cross Valiadation
+reg.cv <- crossValidate(
+  dataset = fishnet_all,
+  id = "uniqueID",
+  dependentVariable = "countEMS",
+  indVariables = reg.vars) %>%
+    dplyr::select(uniqueID = uniqueID, countEMS, Prediction,geometry)
+
+reg.cv.time <- crossValidate(
+  dataset = fishnet_all,
+  id = "week",
+  dependentVariable = "countEMS",
+  indVariables = reg.vars) %>%
+    dplyr::select("Week" = week, countEMS, Prediction,geometry)
+
+reg.summary.space <-
+  mutate(reg.cv, Error = Prediction - countEMS,
+                             Regression = "LOGO CV: Space (Fishnet)")
+
+reg.summary.time <-
+  reg.cv.time %>%
+  mutate(reg.cv.time, Error = Prediction - countEMS,
+                             Regression = "LOGO CV: Time (Day of the Week)")
+```
+
+```{r Plot and Maps and Errors}
+error.fold.space <- 
+  reg.summary.space %>%
+    group_by(uniqueID) %>% 
+    summarize(Mean_Error = mean(Prediction - countEMS, na.rm = T),
+              MAE = mean(abs(Mean_Error), na.rm = T),
+              SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup()
+
+error.fold.space[is.na(error.fold.space)] <- 0
+
+ error.fold.space %>%
+  ggplot(aes(MAE)) + 
+    geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
+    geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 100, by = 20)) + 
+    labs(title="Distribution of MAE", subtitle = "k-fold cross validation: Per Fishnet",
+         x="Mean Absolute Error", y="Count") +
+    plotTheme()
+ 
+ error.fold.time <- 
+  reg.summary.time %>%
+    group_by(Week) %>% 
+    summarize(Mean_Error = mean(Prediction - countEMS, na.rm = T),
+              MAE = mean(abs(Mean_Error), na.rm = T),
+              SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup()
+ 
+  error.fold.time %>%
+  ggplot(aes(MAE)) + 
+    geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
+    geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 14, by = 2)) + labs(title="Distribution of MAE", subtitle = "k-fold cross validation: Per week",
+         x="Mean Absolute Error", y="Count") +
+    plotTheme()
+
+SanMon_Bound <-
+SanMon_Bound %>%
+  st_transform(st_crs(error.fold.space))
+
+error.fold.space %>%
+  ggplot() +
+  geom_sf(data = fishnet) +
+    geom_sf(aes(fill = MAE)) +
+    scale_fill_viridis(direction = -1) +
+    labs(title = "EMS count errors by LOGO Cross-validation by time") +
+    mapTheme() + theme(legend.position="bottom",
+                       legend.title = element_text(size=30),
+                       legend.key.size = unit(1, 'cm'),
+                       legend.text = element_text(size=10),
+                       plot.title = element_text(size=30))
+
+error.fold.time %>%
+  ggplot() +
+  geom_sf(data = fishnet) +
+    geom_sf(aes(fill = MAE)) +
+    scale_fill_viridis(direction = -1) +
+    labs(title = "EMS count errors by LOGO Cross-validation by time") +
+    mapTheme() + theme(legend.position="bottom",
+                       legend.title = element_text(size=30),
+                       legend.key.size = unit(1, 'cm'),
+                       legend.text = element_text(size=10),
+                       plot.title = element_text(size=30))
+
 
 ```
