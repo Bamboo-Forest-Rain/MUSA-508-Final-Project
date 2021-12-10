@@ -424,28 +424,29 @@ fishnet_all %>%
                                 "Overnight")) %>%
   group_by(uniqueID, weekend, time_of_day) %>%
               tally()
+
 DAT_map <-
   DAT_map %>%
   mutate(average.day = case_when(weekend == "Weekend" ~ n/2,
                                  weekend =="Weekday" ~ n/5))
 
 DAT_map <-
-  DAT_map %>%
+   DAT_map %>%
   na.omit()
 
 #Manually add quantile
-DAT_map <-
-  DAT_map %>%
-  mutate(quantile = case_when(average.day > 0 & average.day < 20 ~ "1 - 19",
-                              average.day >= 20 & average.day < 40 ~ "20 - 39",
-                              average.day >= 40 & average.day < 60 ~ "40 - 59",
-                              average.day >= 60 & average.day < 80 ~ "60 - 79",
-                              average.day >= 80 & average.day < 100 ~ "80 - 99",
-                              average.day >= 100 ~ "99 +"))
+ DAT_map <-
+   DAT_map %>%
+  mutate(quantile = case_when(average.day > 0 & average.day < 10 ~ "1 - 9",
+                              average.day >= 10 & average.day < 20 ~ "10 - 19",
+                              average.day >= 20 & average.day < 30 ~ "20 - 29",
+                              average.day >= 30 & average.day < 40 ~ "30 - 39",
+                              average.day >= 40 & average.day < 49 ~ "40 - 49",
+                              average.day >= 50 ~ "49 +"))
   
 ggplot()+
   geom_sf(data = SanMon_Bound) +
-  geom_sf(data = DAT_map,
+  geom_sf(data =  DAT_map,
             aes(fill = quantile)) +
   scale_fill_brewer(palette = "YlGnBu",direction = 1)+
   facet_grid(weekend ~ time_of_day)+
@@ -453,6 +454,24 @@ ggplot()+
        subtitle = "March to November, 2021",
        fill = "EMS calls")+
   mapTheme()
+
+```
+
+```{r Time in Fishnet}
+
+fishnet_all <-               
+fishnet_all %>% 
+            mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
+                                    "Weekday"),
+                time_of_day = case_when(
+                                 hour(interval60) >= 6 & hour(interval60) < 12 ~  
+                                "Morning to noon",
+                                 hour(interval60) >= 12 & hour(interval60) < 18 ~ 
+                                "Afternoon",
+                                 hour(interval60) >= 18 & hour(interval60) <= 23 ~
+                                "Evening",
+                                hour(interval60) >= 0 & hour(interval60) < 6 ~
+                                "Overnight")) %>% na.omit()
 ```
 
 # Geographic related variable
@@ -499,9 +518,12 @@ fishnet_all <-
   fishnet_all %>% 
 mutate(school.nn = nn_function(st_c(st_coid(fishnet_all)),st_c(st_coid(school.sf)),3))
 
+school.cen <-
+  st_centroid(school.sf)
+
 fishnet_all <-
   fishnet_all %>% 
-mutate(school_dist= st_distance(st_coid(fishnet_all),st_coid(school.sf)))
+mutate(school_dist= as.numeric(st_distance(st_coid(fishnet_all),school.cen)))
 ```
 
 ```{r Crime in fishnet}
@@ -513,13 +535,15 @@ SanMon_Crime <-
   st_transform(st_crs(fishnet))
 
 fishnet_Crime <-
-  st_join(SanMon_Crime,fishnet) %>%
+  st_join(SanMon_Crime,fishnet_all) %>%
   mutate(countCrime = 1)
 
 fishnet_Crime <-
   fishnet_Crime %>%
   st_transform(st_crs(fishnet_all))%>%
-  select(geometry,countCrime)
+  group_by(uniqueID)%>%
+  summarize(countCrime = sum(countCrime))%>%
+  select(countCrime,geometry)
 
 fishnet_all <-
   st_join(fishnet_all, fishnet_Crime)
@@ -530,8 +554,7 @@ str(fishnet_all)
 
 fishnet_all <-
   fishnet_all %>%
-<<<<<<< HEAD
-  select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month)
+  select(countEMS,uniqueID,countCrime,cvID, Age_above60,Age_below10,Percent_White,Temperature,Precipitation,Med_Inc,interval60,geometry,week, dotw,month,weekend,time_of_day,DowntownDistance,school.nn,bars.nn)
 
 
 cor_plot <-   st_drop_geometry(fishnet_all) %>%
@@ -541,10 +564,12 @@ cor_plot <-   st_drop_geometry(fishnet_all) %>%
 plot(cor_plot,pch=19,col=rgb(0,0,100,50,maxColorValue=255))
 ```
 
-```{r Regression, fig.height=9, fig.width=8}
-  group_by(uniqueID)%>%
-  mutate(countCrime2 = sum(countCrime))%>%
-  ungroup
+```{r}
+#normalization test and change
+fishnet_all$bars.nn <- fishnet_all$bars.nn %>% scale() 
+fishnet_all$countCrime <- fishnet_all$countCrime %>% scale()
+fishnet_all$DowntownDistance <- fishnet_all$DowntownDistance %>% scale()
+fishnet_all$school.nn <- fishnet_all$school.nn %>% scale()
 ```
 
 
@@ -578,7 +603,6 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
        #       slice(1))
 ```
 
-<<<<<<< HEAD
 ```{r Correlation, fig.height=18, fig.width=8}
 
 
@@ -605,17 +629,36 @@ ggplot(correlation.long, aes(Value, countEMS)) +
 
 ```{r}
 # Histogram for every variable, including y
+str(fishnet_all)
+
+fishnet_all %>%
+    dplyr::select(countEMS, time_of_day) %>%
+      ggplot(., aes(x=time_of_day,y=countEMS)) +   
+        geom_bar(position = "dodge", stat="identity") +
+        labs(x="Time of the Day", y="countEMS",
+             title = "EMS count associated with time of the day",
+             subtitle = "Categorical features") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Histogram for every variable, including y
+
+str(fishnet_all)
 correlation.long_all <-
   st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day) %>%
     gather(Variable, Value)
 
 
 ggplot(correlation.long_all, aes(Value)) + 
     geom_histogram(bins = 30) + 
-    facet_wrap(~Variable, scales = 'free')
+    facet_wrap(~Variable, scales = 'free')+
+  plotTheme()
 
 ```
+
 
 ```{r Regression}
 
@@ -624,7 +667,7 @@ reg1 <-
     lm(countEMS ~  Age_above60 + Age_below10 + Med_Inc + countCrime, data=ride.Train)
 
 reg2 <- 
-  lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature, data=ride.Train)
+  lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + Temperature + DowntownDistance + bars.nn + school.nn + dotw + time_of_day, data=ride.Train)
 
 summary(reg1)
 summary(reg2)
@@ -654,7 +697,7 @@ model_pred <- function(dat, fit){
 week_predictions <- 
   ride.Test.weekNest %>% 
     mutate(OnlySocial = map(.x = data, fit = reg1, .f = model_pred),
-           SocialwithTemp = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
+           SocialwithDistance = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
     mutate(Observed = map(data, pull, countEMS),
            Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
