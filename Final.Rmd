@@ -1,15 +1,27 @@
 ---
-title: "Final"
-author: "Yihong Hu"
+title: "Beepo - A smart way to allocate and dispatch ambulances in Santa Monica"
+author: "Team: YaHoo: Yihong Hu and Hanpu Yao"
 date: "11/29/2021"
-output: html_document
+output: 
+html_document:
+ code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, results = FALSE, warning=FALSE, message = FALSE, cache = TRUE)
 ```
 
-## Introduction
+# Introduction
+
+Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. 
+
+We located the problem to be its ambulance dispatch system. The traditional way to respond an EMS call is to dispatch an ambulance after the station receives a call. The problem is when the nearest station runs out of ambulances, the station needs to request an ambulance from another station further away and adds on to the wait time. 
+
+Thus, we aim to develop the app *beepo* to make ambulance dispatch more efficient in Santa Monica. Our purpose is to manage ambulance vehicles in all four stations citywide, predict when and where the demand of emergency calls rises, and dispatch ambulances to the nearest station when the demand rises.  
 
 ```{r library and functions haha}
 library(osmdata)
@@ -78,10 +90,14 @@ palette2 <- c("#6baed6","#08519c")
 
 ```{r install_census_API_key, warning = FALSE, include=FALSE, eval = TRUE}
 # Install Census API Key
-census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE)
+census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE, install = TRUE)
 ```
 
-## Including Plots
+# Exploratory Analysis 
+
+Our EMS data is filtered from the 911 calls on Santa Monica's open portal. To obtain a unbiased data set, we decided to only analyze the EMS calls from March to November in 2021. This is to eliminate any uncertainty from the pandemic while keeping the data as recent as possible. 
+
+We lubricated the time by hour, day of the week, week, month, and year. We calculated the mean response time from the data set: 29.8 minutes.
 
 ```{r read}
 # read GeoJson. query the data of EMS only and between March 2021 and November 2021
@@ -102,8 +118,14 @@ mean(Fire_call$response_time)
 #average response time 29.81 minutes
 ```
 
+We began the data wrangling process by answering the question: "Why would one call an ambulance?". The answer could be either be because of internal health issues or external accidents. Health issues may be related to population density, the age of the population and the temperature (hotter weather is related to higher rate of cardiovascular disease). Accidents may related to substance misuse or abuse and injuries caused by violence or traffic. We also thught of some social economic factors that could make a patient reluctant to call an ambulance, such his or her poverty status. 
+
+## Census Data
+
+Tracing this logic, we gathered population-related data from the American Community Survey by the U.S. Census Bureau. The data is avaliable on a census tract level. We filtered out the census tracts that belong to Santa Monica.  
 
 ```{r Census with Age}
+#Santa Monica Census Information
 SanMon_Census <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
@@ -137,7 +159,8 @@ SanMon_Census <-
          Percent_Taking_Public_Trans = Total_Public_Trans / Means_of_Transport)%>%
   filter(GEOID == "06037701304" | GEOID == "06037701201" | GEOID == "06037701601" |GEOID == "06037701202"|GEOID == "06037701302"|GEOID == "06037701402"|GEOID == "06037701602"|GEOID == "06037701502"|GEOID == "06037701701"|GEOID == "06037701702"|GEOID == "06037701801"| GEOID == "06037701802"|GEOID == "06037701902"|GEOID == "06037702300"|GEOID == "06037702201"|GEOID == "06037702002"|GEOID == "06037702202"|GEOID == "06037702102"|GEOID == "06037701501")%>%
   st_sf()
- 
+
+#Santa Monica Shapefile
 SanMonTracts <- 
   SanMon_Census %>%
   as.data.frame() %>%
@@ -147,13 +170,13 @@ SanMonTracts <-
 
 ```
 
-The NAs are mainly in location, which can only be omited for later process.
 ```{r}
 # check NAs in the dataset
 aggr(Fire_call, prop = F, number = T)
 ```
 
 ```{r}
+#Make call locations as a point geometry file
 Fire_call <- na.omit(Fire_call)
 Fire_call <- Fire_call %>% st_as_sf(coords = c("longitude","latitude"), crs=4326
                                         ,agr = "constant")
@@ -162,15 +185,22 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 
 ```
 
+We examined the call demand by day of the week and by hour to see if the time process matters. Fig 1 plots the number of EMS calls against hour of the day. Each line on the figure represents a day in a week. 
+
 ```{r Call by Day of the week}
 #Add call per hour by day of the week 
 ggplot(Fire_call %>% mutate(hour = hour(received)))+
      geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
   labs(title="EMS Calls by Day of the Week March to November, 2021",
        x="Hour", 
-       y="EMS Call Counts")+
+       y="EMS Call Counts", caption = "Fig 1")+
      plotTheme()
 ```
+## Demand and Time
+
+The lines follow a general trend. We see that the calls happened most frequently between 10am to 8pm. This shows time indeed plays a role in predicting the demand.
+
+We then examine the demand during the weekend and weekdays. Fig 2 plots the result. 
 
 ```{r Comparsion between weekday and weekend}
 ggplot(Fire_call %>% 
@@ -179,10 +209,15 @@ ggplot(Fire_call %>%
      geom_freqpoly(aes(hour, color = weekend), binwidth = 1)+
   labs(title="EMS call - weekend vs weekday, March and November, 2021",
        x="Hour", 
-       y="EMS Call Count")+
+       y="EMS Call Count", caption = "Fig 2")+
      plotTheme()
 
 ```
+The plot shows that the calls on the weekdays are higher than that on weekends. We see that whether the day is on a weekend or not is not too significant to the demand. This makes sense, unlike travel patterns that may be greatly impacted by non-working days, medical calls are pretty spontaneous during the week. 
+
+## Demand and Crime
+
+Injuries are often caused by aggressive actions, and these aggressive actions are outcomes of violation of laws. We downloaded the crime data from the city's open data portal and filtered out crime that are related to violence, firearms, murder, and aggressive assault. 
 
 ```{r crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
@@ -194,17 +229,36 @@ SanMon_Crime <-
   st_as_sf(coords = c("longitude","latitude"),crs=4326,agr = "constant")
   
 SanMon_Crime <- SanMon_Crime %>% 
-<<<<<<< HEAD
   select(geometry, ucr)%>%
   st_transform(st_crs(Fire_call))
 
 Fire_call <- 
   st_join(Fire_call,SanMon_Crime)
-=======
-  select(geometry, ucr)
->>>>>>> 2c2b6b3f40a4794f9577c04cd2b9306594c3eba6
- 
+
 ```
+
+## Demand and Weather
+
+We downloaded the weather data measured by Santa Monica Airport. We will access its correlation with demand later. 
+
+```{r weather}
+weather.Panel <- 
+  riem_measures(station = "SMO", date_start = "2021-03-01", date_end = "2021-11-30") %>%
+  dplyr::select(valid, tmpf, p01i, sknt)%>%
+  replace(is.na(.), 0) %>%
+    mutate(interval60 = ymd_h(substr(valid,1,13))) %>%
+    mutate(week = week(interval60),
+           dotw = wday(interval60, label=TRUE)) %>%
+    group_by(interval60) %>%
+    summarize(Temperature = max(tmpf),
+              Precipitation = sum(p01i),
+              Wind_Speed = max(sknt)) %>%
+    mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
+```
+
+## Demand and Geography
+
+To see if geo-spatial process matters in predicting the demand, we first start by visualizing the number of calls on Santa Monica map. 
 
 ```{r}
 #fire station location
@@ -231,27 +285,15 @@ ggplot() +
                     labels = c('Station', 'EMS call'))+
   guides(size =F)+
   labs(title = "EMS calls and station map",
-       color = "Key"
+       color = "Key", caption = "Fig 3"
        ) +
   mapTheme()
 
 ```
 
+From a first glance, we could already see that the some spaces are overlapped more with call "points" than others in Fig 3. However, this is not clear enough. 
 
-```{r weather}
-weather.Panel <- 
-  riem_measures(station = "SMO", date_start = "2021-03-01", date_end = "2021-11-30") %>%
-  dplyr::select(valid, tmpf, p01i, sknt)%>%
-  replace(is.na(.), 0) %>%
-    mutate(interval60 = ymd_h(substr(valid,1,13))) %>%
-    mutate(week = week(interval60),
-           dotw = wday(interval60, label=TRUE)) %>%
-    group_by(interval60) %>%
-    summarize(Temperature = max(tmpf),
-              Precipitation = sum(p01i),
-              Wind_Speed = max(sknt)) %>%
-    mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
-```
+We decided to make a fishnet, with each cell at the length of 200 by 200 feet. It is a nice size for a small city like Santa Monica while still making our analysis spatially significant. We will count the number of calls in each cell. 
 
 ```{r fishet}
 SanMon_Bound <- st_read("https://opendata.arcgis.com/datasets/d1a7c19d793c482b928a2b8d1abebdd4_0.geojson")%>%
@@ -266,7 +308,6 @@ fishnet <- fishnet[SanMon_Bound,]
 
 fishnet <-st_transform(fishnet, st_crs(Fire_call))
 ```
-
 
 ```{r Call Count}
 EMS_net <- 
@@ -296,28 +337,29 @@ ggplot() +
   geom_sf(data = EMS_net, aes(fill = countEMS)) +
   scale_fill_viridis() +
   labs(title = "Count of EMS calls for the fishnet",
-       fill = "EMS call Count") +
+       fill = "EMS call Count", caption = "Fig 4") +
   mapTheme()
 
-ggplot() +
-  geom_sf(data = EMS_net_res, aes(fill = mean_response))+
-  geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
-  scale_fill_viridis_b()+
-  labs(title = "Response time in Santa Monica", fill = "Second")+
-  mapTheme()
+#Response Time Map
+#ggplot() +
+ # geom_sf(data = EMS_net_res, aes(fill = mean_response))+
+  #geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
+  #scale_fill_viridis_b()+
+  #labs(title = "Response time in Santa Monica", fill = "Second")+
+  #mapTheme()
 ```
 
 ```{r trip_timeseries }
-ggplot(fishnet_all %>%
-         group_by(interval60) %>%
-         tally())+
-  geom_line(aes(x = interval60, y = n))+
-  labs(title="Bike share trips per hr. Boston, August and September, 2019",
-       x="Date", 
-       y="Number of trips", caption = "Fig 2")+
-  plotTheme()
+#ggplot(fishnet_all %>%
+ #        group_by(interval60) %>%
+  #       tally())+
+  #geom_line(aes(x = interval60, y = n))+
+  #labs(title="Bike share trips per hr. Boston, August and September, 2019",
+   #    x="Date", 
+  #     y="Number of trips", caption = "Fig 2")+
+  #plotTheme()
 ```
-
+Fig 5 maps the call hotspots
 
 ```{r}
 Fire_call <- Fire_call %>% 
@@ -336,6 +378,10 @@ ggplot() +
   scale_alpha(range = c(0.00, 0.50), guide = FALSE) +
   mapTheme(title_size = 14) + theme(legend.position = "none")
 ```
+We can see from Fig 4 and Fig 5 that most of the calls are concentrated at the center left of the map. This makes sense. After we surveyed the areas, we realized that it is the downtown area plus there are many bars around. That incentive us to add a distance to downtown and distance to the nearest bars as geo-spatial factors later. 
+
+## Join Variables with Fishnet
+
 ```{r lag}
 #EMS_net_res_nona <-
  # EMS_net_res %>%
