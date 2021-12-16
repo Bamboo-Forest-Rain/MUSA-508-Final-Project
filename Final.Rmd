@@ -166,21 +166,20 @@ Fire_call_geo <- st_transform(Fire_call_geo, st_crs(SanMon_Census))
 #Add call per hour by day of the week 
 ggplot(Fire_call %>% mutate(hour = hour(received)))+
      geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
-  labs(title="EMS Calls by Day of the Week March to November",
+  labs(title="EMS Calls by Day of the Week March to November, 2021",
        x="Hour", 
        y="EMS Call Counts")+
      plotTheme()
 ```
 
 ```{r Comparsion between weekday and weekend}
-
 ggplot(Fire_call %>% 
          mutate(hour = hour(received),
-                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday")))+
+                weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"))) +
      geom_freqpoly(aes(hour, color = weekend), binwidth = 1)+
-  labs(title="EMS call - weekend vs weekday, March\n and November, 2021",
+  labs(title="EMS call - weekend vs weekday, March and November, 2021",
        x="Hour", 
-       y="EMS Call Count", caption = "Fig 5")+
+       y="EMS Call Count")+
      plotTheme()
 
 ```
@@ -226,13 +225,15 @@ road <- st_read("https://opendata.arcgis.com/datasets/6728cb1cb2724dc5ad07f79944
 ggplot() + 
   geom_sf(data = SanMon_Census, colour="red",fill="grey40", size=0.1) +
   geom_sf(data = road,color = 'grey80') +
-  geom_sf(data = Fire_call_geo,aes(color = 'yellow')) +
-  geom_sf(station,mapping = aes(color='red',size=1.5)) + # don
+  geom_sf(data = Fire_call_geo,aes(color = 'yellow',alpha = 1.5)) +
+  geom_sf(station,mapping = aes(color='red'),size=3,alpha=1) + # don
   scale_color_manual(values = c( 'red', 'yellow'),
                     labels = c('Station', 'EMS call'))+
   guides(size =F)+
-  labs(title = "EMS calls and station map") +
-  mapTheme(title_size = 30)
+  labs(title = "EMS calls and station map",
+       color = "Key"
+       ) +
+  mapTheme()
 
 ```
 
@@ -276,15 +277,6 @@ EMS_net <-
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
-#EMS_net_crime <- 
- # dplyr::select(Fire_call) %>% na.omit()%>%
-  #mutate(countCrime = 1) %>% 
-  #aggregate(., fishnet, sum) %>%
-  #mutate(countCrime = replace_na(countCrime, 0),
-    #     uniqueID = rownames(.),
-     #    cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE)) %>%
-  #select(geometry,countCrime)
-
 
 EMS_net_res <-
   st_join(EMS_net,Fire_call)%>%
@@ -326,34 +318,6 @@ ggplot(fishnet_all %>%
   plotTheme()
 ```
 
-
-```{r Kernal Density}
-#EMS_ppp <- as.ppp(st_coordinates(Fire_call_geo), W = st_bbox(fishnet))
-#EMS_KD <- density.ppp(EMS_ppp, 2)
-
-#Fire_call_geo <-
-#  Fire_call_geo %>%
-  #st_transform('ESRI:102271') 
-
-#EMS_KDE_sf <- as.data.frame(EMS_KD) %>%
- # st_as_sf(coords = c("x", "y"), crs = st_crs(fishnet)) %>%
-  #aggregate(., fishnet, mean) %>%
-  #mutate(label = "Kernel Density",
-   #      EMS_Demand = ntile(value, 300)) %>%
-  #cbind(
-   # aggregate(
-    #  dplyr::select(Fire_call) %>% mutate(EMSCount = 1), ., sum) %>%
-    #mutate(EMSCount = replace_na(EMSCount, 0))) %>%
- # dplyr::select(label, EMS_Demand, EMSCount)
-
-ggplot()+
-  geom_sf(data = EMS_KDE_sf,aes(fill = EMS_Demand), colour = NA) +
-  geom_sf(data = sample_n(Fire_call_geo, 3000), size = .5, colour = "black") +
-  scale_fill_viridis() +
-    labs(title="Comparison of Kernel Density and Risk Predictions",
-         subtitle="2017 burglar risk predictions; 2018 burglaries") +
-    mapTheme()
-```
 
 ```{r}
 Fire_call <- Fire_call %>% 
@@ -415,7 +379,7 @@ fishnet_all %>%
                                     "Weekday"),
                 time_of_day = case_when(
                                  hour(interval60) >= 6 & hour(interval60) < 12 ~  
-                                "Morning to noon",
+                                "Morning",
                                  hour(interval60) >= 12 & hour(interval60) < 18 ~ 
                                 "Afternoon",
                                  hour(interval60) >= 18 & hour(interval60) <= 23 ~
@@ -519,11 +483,15 @@ fishnet_all <-
 mutate(school.nn = nn_function(st_c(st_coid(fishnet_all)),st_c(st_coid(school.sf)),3))
 
 school.cen <-
-  st_centroid(school.sf)
+  st_centroid(school.sf) 
+
+  school.cen$NAME[is.na(school.sf$NAME)] <- "Hello School"
 
 fishnet_all <-
   fishnet_all %>% 
-mutate(school_dist= as.numeric(st_distance(st_coid(fishnet_all),school.cen)))
+mutate(school_dist= as.numeric(st_distance(st_coid(fishnet),school.cen)))
+
+fishnet_all$school_dist = as.numeric(st_distance(st_coid(fishnet),school.cen))
 ```
 
 ```{r Crime in fishnet}
@@ -603,11 +571,11 @@ group_by(ride.Train, month, uniqueID) %>%na.omit()%>%
        #       slice(1))
 ```
 
-```{r Correlation, fig.height=18, fig.width=8}
+```{r Correlation, fig.height=12, fig.width=15}
 #Plots to look at correlations between interested variables
 correlation.long <-
   st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day,-week,-Temperature) %>%
+    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day,-week,-Temperature,-interval60) %>%
     gather(Variable, Value, -countEMS)
 
 correlation.cor <-
@@ -620,8 +588,8 @@ ggplot(correlation.long, aes(Value, countEMS)) +
   geom_text(data = correlation.cor, aes(label = paste("r =", round(correlation, 2))),
             x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~Variable, ncol = 2, scales = "free") +
-  labs(title = "Burglary count as a function of risk factors") +
+  facet_wrap(~Variable, ncol = 4, scales = "free") +
+  labs(title = "EMS count as a function of Interested Variables") +
   plotTheme()
 ```
 
@@ -679,8 +647,8 @@ model_pred <- function(dat, fit){
 
 week_predictions <- 
   ride.Test.weekNest %>% 
-    mutate(OnlySocial = map(.x = data, fit = reg1, .f = model_pred),
-          SocialwithGeo = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
+    mutate("Social Factors Only" = map(.x = data, fit = reg1, .f = model_pred),
+          "Social with Geo-spacial and Time Factors" = map(.x = data, fit = reg2, .f = model_pred))%>%     gather(Regression, Prediction, -data, -week) %>%
     mutate(Observed = map(data, pull, countEMS),
            Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
@@ -767,7 +735,7 @@ error.fold.space[is.na(error.fold.space)] <- 0
   ggplot(aes(MAE)) + 
     geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
     geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 100, by = 20)) + 
-    labs(title="Distribution of MAE", subtitle = "k-fold cross validation: Per Fishnet",
+    labs(title="Distribution of MAE", subtitle = "LOGO cross validation: Per Fishnet",
          x="Mean Absolute Error", y="Count") +
     plotTheme()
  
@@ -782,7 +750,7 @@ error.fold.space[is.na(error.fold.space)] <- 0
   error.fold.time %>%
   ggplot(aes(MAE)) + 
     geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
-    geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 14, by = 2)) + labs(title="Distribution of MAE", subtitle = "k-fold cross validation: Per week",
+    geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 14, by = 2)) + labs(title="Distribution of MAE", subtitle = "LOGO cross validation: Per week",
          x="Mean Absolute Error", y="Count") +
     plotTheme()
 
