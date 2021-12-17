@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE, results = FALSE, warning=FALSE, message = FAL
 
 # Introduction
 
-Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. The response time over different locations in the city is displayed in the map below. 
+Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. 
 
 We located the problem to be its ambulance dispatch system. The traditional way to respond an EMS call is to dispatch an ambulance after the station receives a call. The problem is when the nearest station runs out of ambulances, the station needs to request an ambulance from another station further away and adds on to the wait time. 
 
@@ -126,10 +126,10 @@ We begin the data wrangling process by answering the question: "Why would one ca
 
 ## Census Data
 
-Tracing this logic, we gathered population-related data from the American Community Survey by the U.S. Census Bureau. The data is avaliable on a census tract level. We filtered out the census tracts that belong to Santa Monica.  
+Tracing this logic, we gathered population-related data from the American Community Survey (ACS) by the U.S. Census Bureau. The data is avaliable on a census tract level. We filtered out the census tracts that belong to Santa Monica.  
 
 ```{r Census with Age}
-#Santa Monica Census Information
+#Santa Monica 2019 ACS Information
 SanMon_Census <- 
   get_acs(geography = "tract", 
           variables = c("B01003_001", "B19013_001", 
@@ -224,7 +224,7 @@ The plot shows that the calls on the weekdays are higher than that on weekends. 
 
 Injuries are often caused by aggressive actions, and these aggressive actions are outcomes of violation of laws. We download the crime data from the city's open data portal and filter out crime that are related to violence, firearms, murder, and aggressive assault. 
 
-```{r crime}
+```{r Crime}
 SanMon_Crime <- read.socrata("https://data.smgov.net/resource/kn6p-4y74.json?$where=date_occurred between '2021-03-01' and '2021-11-30'") %>%
   filter(grepl('Robbery|Homicide|Family|Arson|Agg Assault|All Other Offenses|Manslaughter', ucr_description)) 
 
@@ -265,7 +265,7 @@ weather.Panel <-
 
 To see if geo-spatial process matters in predicting the demand, we first start by visualizing the number of calls on Santa Monica map. 
 
-```{r}
+```{r Fire Station}
 #fire station location
 station <- st_read("Fire_Station/doc.kml")
 station <- st_zm(station) %>% st_transform(st_crs(SanMon_Census))   #drop the third dimension of coordinates
@@ -280,7 +280,8 @@ road <- st_read("https://opendata.arcgis.com/datasets/6728cb1cb2724dc5ad07f79944
 
 
 
-```{r fig.height=5, fig.width=5}
+```{r Call Density, fig.height=5, fig.width=5}
+#Call Location Points
 ggplot() + 
   geom_sf(data = SanMon_Census, colour="red",fill="grey40", size=0.1) +
   geom_sf(data = road,color = 'grey80') +
@@ -344,26 +345,8 @@ ggplot() +
   labs(title = "Count of EMS calls for the fishnet",
        fill = "EMS call Count", caption = "Fig 4") +
   mapTheme()
-
-#Response Time Map
-#ggplot() +
- # geom_sf(data = EMS_net_res, aes(fill = mean_response))+
-  #geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
-  #scale_fill_viridis_b()+
-  #labs(title = "Response time in Santa Monica", fill = "Second")+
-  #mapTheme()
 ```
 
-```{r trip_timeseries }
-#ggplot(fishnet_all %>%
- #        group_by(interval60) %>%
-  #       tally())+
-  #geom_line(aes(x = interval60, y = n))+
-  #labs(title="Bike share trips per hr. Boston, August and September, 2019",
-   #    x="Date", 
-  #     y="Number of trips", caption = "Fig 2")+
-  #plotTheme()
-```
 Fig 5 maps the call hotspots.
 
 ```{r}
@@ -389,25 +372,6 @@ We can see from Fig 4 and Fig 5 that most of the calls are concentrated at the c
 ## Join Variables with Fishnet
 
 In order to analyze data on a fishnet level, we have to wrangle the data into the fishnet. 
-
-
-```{r lag}
-#EMS_net_res_nona <-
- # EMS_net_res %>%
-  #na.omit()
-
-#ride.panel <- 
- # ride.panel %>% 
-  #  arrange(na.omit(EMS_net_res), interval60) %>% 
-   # group_by(Pickup.Census.Tract) %>% 
-    #mutate(lagHour = dplyr::lag(Trip_Count,1),
-     #      lag2Hours = dplyr::lag(Trip_Count,2),
-      #     lag3Hours = dplyr::lag(Trip_Count,3),
-       #    lag4Hours = dplyr::lag(Trip_Count,4),
-        #   lag12Hours = dplyr::lag(Trip_Count,12),
-         #  lag1day = dplyr::lag(Trip_Count,24)) %>% 
-#   ungroup()
-```
 
 ### Join Census,Time, Temperature Data
 
@@ -773,7 +737,6 @@ week_predictions
 Fig 10 plots the mean absolute error for regression 1 and regression 2. 
 
 ```{r}
-
 #Absolute Errors Comparison between regressions
 week_predictions %>%
   dplyr::select(week, Regression, MAE) %>%
@@ -786,21 +749,6 @@ week_predictions %>%
 ```
 
 Our model marked in dark blue showed significant less errors compared to regression 1. The average error per day is at most 6. This shows that our model has promising results. 
-
-```{r}
-#Hanpu check if you have anything to do with this repeated chunk
-# Histogram for every variable, inclufing y
-correlation.long <-
-  st_drop_geometry(fishnet_all) %>%
-    dplyr::select(-uniqueID, -cvID, -dotw, -weekend, -time_of_day,-week,-Temperature) %>%
-    gather(Variable, Value, -countEMS)
-
-
-ggplot(correlation.long_all, aes(Value)) + 
-    geom_histogram(bins = 30) + 
-    facet_wrap(~Variable, scales = 'free')
-
-```
 
 ## Cross-Validation
 
