@@ -15,13 +15,61 @@ output:
 knitr::opts_chunk$set(echo = TRUE, results = FALSE, warning=FALSE, message = FALSE, cache = TRUE)
 ```
 
-# Introduction
+# 1. Introduction
 
 Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. 
 
 We located the problem to be its ambulance dispatch system. The traditional way to respond an EMS call is to dispatch an ambulance after the station receives a call. The problem is when the nearest station runs out of ambulances, the station needs to request an ambulance from another station further away and adds on to the wait time. 
 
 Thus, we aim to develop the app *beepo* to make ambulance dispatch more efficient in Santa Monica. Our purpose is to manage ambulance vehicles in all four stations citywide, predict when and where the demand of emergency calls rises, and dispatch ambulances to the nearest station when the demand rises.  
+
+
+## 1.1 Video
+
+https://youtu.be/MAMz5KK6qwY
+
+# 2. App dashboard
+
+Our app *beepo* has two major panel, one is allocate and the other is dispatch.
+
+
+### Allocate panel
+
+The allocate panel helps you understand the ambulance situation citywide. It consists of 3 part: map, station status and next 6 hours risk area.
+
+
+![](Final_files\figure-html\EMS dispatch dashboard.jpg)
+
+- **Station status**
+
+  + Station status tells you the real-time information of the number of ambulance in every station. Ambulance status is categorized into 3 type:
+    - <span style="color: red;">Red</span>: the number of ambulance busy in duty. <span style="color: green;">Green</span>: the number of ambulance available in a station. <span style="color: blue;">Blue</span>: capacity. The number of empty slots in a station which is the maximum number of ambulances to reallocate to this station from other place.
+
+- **Map**
+  + the points show the location of four emergency stations. The station status is shown as the color of point.
+  + the heatmap visualizes potentially high demand areas in the next 6 hours in terms of its demand level. A legend of gradient color bar is in the lower right corner of the map for reference.
+- **Next 6 hours risk area**
+    +  This is the core function of this app. with our predictive model, it helps you find the potentially high risk area in the next 6 hours. In this panel, the location of predicted high demand areas are listed with their nearest station in the order of demand level.
+    +  The color of exclamation mark notify you the status of the nearest station. Red is inadequate available number of ambulance; Yellow is enough ambulance in the station; Green is sufficient and can even allocate some ambulances to other stations.
+
+### Dispatch panel
+
+In dispatch panel, you can decide how to arrange your EMS resource. It consists of 3 parts: dispatch, schedule and map
+
+![](Final_files\figure-html\EMS dispatch dashboard-1.jpg)
+
+- **Map**
+
+The map shows the real-time tracking and navigation of every ambulance. Including its orgination, destination and time to arrive.
+
+- **Schedule**
+
+Schedule records the ambulance available time in a day.
+
+- **Dispatch**
+
+You can decide the detail information to dispatch your ambulance, such as location, time, what equipment to carry in an ambulance.
+
 
 ```{r library and functions}
 library(osmdata)
@@ -97,6 +145,7 @@ census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE, inst
 ```{r pressure, result=TRUE,echo=FALSE,fig.cap="Response Time Santa Monica", out.width = '100%'}
 include_graphics("./santa_monica.png")
 ```
+
 # Exploratory Analysis 
 
 Our EMS data is filtered from the 911 calls on Santa Monica's open portal. To obtain a unbiased data set, we decided to only analyze the EMS calls from March to November in 2021. This is to eliminate any uncertainty from the pandemic while keeping the data as recent as possible. 
@@ -218,6 +267,7 @@ ggplot(Fire_call %>%
      plotTheme()
 
 ```
+
 The plot shows that the calls on the weekdays are higher than that on weekends. We see that whether the day is on a weekend or not is not too significant to the demand. This makes sense, unlike travel patterns that may be greatly impacted by non-working days, medical calls are pretty spontaneous during the week. 
 
 ## Demand and Crime
@@ -363,6 +413,7 @@ ggplot() +
                  aes(X, Y, fill = ..level.., alpha = ..level..),
                  size = 0.01, bins = 40, geom = 'polygon') +
   scale_fill_viridis() +
+  labs(title = "Heatmap of EMS calls", caption = "Fig 5")+
   scale_alpha(range = c(0.00, 0.50), guide = FALSE) +
   mapTheme(title_size = 14) + theme(legend.position = "none")
 ```
@@ -401,7 +452,7 @@ fishnet_all <-
 As we have mentioned before, it seems like there are some calling peaks during a day. It would be wise to categorize the time into morning, afternoon, evening, and overnight to count the time factor. 
 
 
-```{r Call by Fishnet Time Separated, fig.height=4, fig.width=6}
+```{r Call by Fishnet Time Separated, fig.height=6, fig.width=8}
 DAT_map <-               
 fishnet_all %>% 
             mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend",         
@@ -606,7 +657,7 @@ We first split our fishnet into a training set and testing set. Training set con
 
 Before we went further, we examined if month would influence the number of calls.  
 
-```{r Regression}
+```{r Regression, fig.height=7, fig.width=7}
 #Split Testing and Training Sets
 ride.Train <- filter(fishnet_all, week < 35)
 ride.Test <- filter(fishnet_all, week >= 35)
@@ -615,8 +666,8 @@ ride.Test <- filter(fishnet_all, week >= 35)
 group_by(fishnet_all, month, uniqueID) %>%na.omit()%>%
   summarize(countEMS = sum(countEMS)) %>%
   ungroup() %>% 
-  ggplot() + geom_sf(data = SanMon_Bound, fill="grey50") + geom_sf(aes(fill = countEMS)) +
-    facet_wrap(~month, ncol = 8) +
+  ggplot() + geom_sf(data = SanMon_Bound, fill="grey70") + geom_sf(aes(fill = countEMS)) +
+    facet_wrap(~month, ncol = 4) +
     scale_fill_viridis_b(name = "EMS Call Count") +
     labs(title="Sum of calls by fishnet by Month", caption = "Fig 8") +
     mapTheme() + theme(legend.position = "bottom",legend.key.height= unit(0.5, 'cm'),
