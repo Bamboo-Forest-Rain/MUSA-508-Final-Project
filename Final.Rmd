@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE, results = FALSE, warning=FALSE, message = FAL
 
 # Introduction
 
-Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. 
+Santa Monica has one of the country's most inefficient emergent medical service (EMS) system. The national average time for an ambulance to respond a emergency call is 7 minutes. Even in a rural setting, the average response time is 14 minutes. Santa Monica, however, based on the city data from March to November 2021, takes averagely 30 minutes from receiving the call to arrive the destination, much longer than that of the national average. The response time over different locations in the city is displayed in the map below. 
 
 We located the problem to be its ambulance dispatch system. The traditional way to respond an EMS call is to dispatch an ambulance after the station receives a call. The problem is when the nearest station runs out of ambulances, the station needs to request an ambulance from another station further away and adds on to the wait time. 
 
@@ -47,6 +47,7 @@ library(RColorBrewer)
 #library(VIM) # check NAs
 library(ggformula)
 library(stargazer)
+
 
 plotTheme <- theme(
   plot.title =element_text(size=12),
@@ -94,6 +95,9 @@ palette2 <- c("#6baed6","#08519c")
 census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE, install = TRUE)
 ```
 
+```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%'}
+knitr::include_graphics("santa-monica.png")
+```
 # Exploratory Analysis 
 
 Our EMS data is filtered from the 911 calls on Santa Monica's open portal. To obtain a unbiased data set, we decided to only analyze the EMS calls from March to November in 2021. This is to eliminate any uncertainty from the pandemic while keeping the data as recent as possible. 
@@ -342,13 +346,13 @@ ggplot() +
        fill = "EMS call Count", caption = "Fig 4") +
   mapTheme()
 
-#Response Time Map
-#ggplot() +
- # geom_sf(data = EMS_net_res, aes(fill = mean_response))+
-  #geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
-  #scale_fill_viridis_b()+
-  #labs(title = "Response time in Santa Monica", fill = "Second")+
-  #mapTheme()
+Response Time Map
+ggplot() +
+  geom_sf(data = EMS_net_res, aes(fill = mean_response))+
+  geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
+  scale_fill_viridis_b()+
+  labs(title = "Response time in Santa Monica", fill = "Second")+
+  mapTheme()
 ```
 
 ```{r trip_timeseries }
