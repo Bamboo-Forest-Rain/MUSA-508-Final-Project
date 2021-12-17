@@ -3,8 +3,8 @@ title: "Beepo - A smart way to allocate and dispatch ambulances in Santa Monica"
 author: "Team: YaHoo: Yihong Hu and Hanpu Yao"
 date: "11/29/2021"
 output: 
-html_document:
- code_folding: hide
+  html_document:
+    code_folding: hide
     toc: true
     toc_float:
       collapsed: true
@@ -45,7 +45,6 @@ library(spdep)
 library(spatstat)
 library(RColorBrewer)
 #library(VIM) # check NAs
-library(ggformula)
 library(stargazer)
 
 
@@ -177,7 +176,7 @@ SanMonTracts <-
 
 ```{r}
 # check NAs in the dataset
-aggr(Fire_call, prop = F, number = T)
+#aggr(Fire_call, prop = F, number = T)
 ```
 
 ```{r}
@@ -346,13 +345,13 @@ ggplot() +
        fill = "EMS call Count", caption = "Fig 4") +
   mapTheme()
 
-Response Time Map
-ggplot() +
-  geom_sf(data = EMS_net_res, aes(fill = mean_response))+
-  geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
-  scale_fill_viridis_b()+
-  labs(title = "Response time in Santa Monica", fill = "Second")+
-  mapTheme()
+#Response Time Map
+#ggplot() +
+ # geom_sf(data = EMS_net_res, aes(fill = mean_response))+
+  #geom_sf(data = st_transform(station,crs = 4326),color = "red",size =2)+
+  #scale_fill_viridis_b()+
+  #labs(title = "Response time in Santa Monica", fill = "Second")+
+  #mapTheme()
 ```
 
 ```{r trip_timeseries }
@@ -384,6 +383,7 @@ ggplot() +
   scale_alpha(range = c(0.00, 0.50), guide = FALSE) +
   mapTheme(title_size = 14) + theme(legend.position = "none")
 ```
+
 We can see from Fig 4 and Fig 5 that most of the calls are concentrated at the center left of the map. This makes sense. After we surveyed the areas, we realized that it is the downtown area plus there are many bars around. That incentive us to add a distance to downtown and distance to the nearest bars as geo-spatial factors later. 
 
 ## Join Variables with Fishnet
@@ -623,7 +623,7 @@ correlation.long_all <-
 ggplot(correlation.long_all, aes(Value)) + 
     geom_histogram(bins = 30) + 
     facet_wrap(~Variable, scales = 'free')+
-    label(title = "Distribution of Variables", caption = "Fig 7")
+    labs(title = "Distribution of Variables", caption = "Fig 7")
   plotTheme()
 
 ```
@@ -655,9 +655,11 @@ group_by(fishnet_all, month, uniqueID) %>%na.omit()%>%
     facet_wrap(~month, ncol = 8) +
     scale_fill_viridis_b(name = "EMS Call Count") +
     labs(title="Sum of calls by fishnet by Month", caption = "Fig 8") +
-    mapTheme() + theme(legend.position = "bottom") 
+    mapTheme() + theme(legend.position = "bottom",legend.key.height= unit(0.5, 'cm'),
+        legend.key.width= unit(1, 'cm'))
 
 ```
+
 It turns out the call numbers were pretty steady. This outcome suggests we could proceed into splitting data this way without worrying about an outliar month that has a sudden decrease or increase in call numbers.
 
 ```{r week lag}
@@ -698,13 +700,14 @@ ggplot(correlation.long, aes(Value, countEMS)) +
   labs(title = "EMS count as a function of Interested Variables", caption = "Fig 8") +
   plotTheme()
 ```
+
 Fig 9 shows that some of variables are very strongly correlated with the number of EMS calls. The correlation is especially strong with crime count, achieving a r of 0.89, followed by distance to downtown (r = -0.53), distance to the nearest bars (r = -0.46), and median income (r = - 0.39).
 
 ## Regression
 
 We chose the variables that demonstrated strong correlations to develop our regression model. We developed two models for comparison. Regression 1 only has social-economic factors. Regression 2 has time and spatial processes on top of that. 
 
-```{r Regression, results='asis'}
+```{r Regression 2, results='asis'}
 
 #Add Regressions
 reg1 <- 
@@ -713,13 +716,17 @@ reg1 <-
 reg2 <- 
   lm(countEMS ~  hour(interval60) + Age_above60 + Age_below10 + Med_Inc + countCrime + DowntownDistance + bars.nn + school.nn + dotw + time_of_day, data=ride.Train)
 
-summary(reg1)
-summary(reg2)
-
 #If this does not show up clearly, could be deleted from the code chunk
-stargazer(reg1, out = "html")
-stargazer(reg2, out = "html")
+stargazer(reg1, type = "html")
 ```
+
+
+
+```{r, results = 'asis'}
+stargazer(reg2, type = "html")
+
+```
+
 
 Regression 1 has an r-square only of 0.27. Regression 2 tripled that r-square and made it to 0.82. This means our model is very temporally and geographically dependent.
 
@@ -760,6 +767,7 @@ week_predictions <-
 
 week_predictions
 ```
+
 ## Absolute Error
 
 Fig 10 plots the mean absolute error for regression 1 and regression 2. 
