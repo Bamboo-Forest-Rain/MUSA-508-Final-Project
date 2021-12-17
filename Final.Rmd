@@ -1,6 +1,6 @@
 ---
 title: "Beepo - A smart way to allocate and dispatch ambulances in Santa Monica"
-author: "Team: YaHoo: Yihong Hu and Hanpu Yao"
+author: "Team: YaHoo - Yihong Hu and Hanpu Yao"
 date: "11/29/2021"
 output: 
   html_document:
@@ -23,7 +23,7 @@ We located the problem to be its ambulance dispatch system. The traditional way 
 
 Thus, we aim to develop the app *beepo* to make ambulance dispatch more efficient in Santa Monica. Our purpose is to manage ambulance vehicles in all four stations citywide, predict when and where the demand of emergency calls rises, and dispatch ambulances to the nearest station when the demand rises.  
 
-```{r library and functions haha}
+```{r library and functions}
 library(osmdata)
 library(tidyverse)
 library(sf)
@@ -94,8 +94,8 @@ palette2 <- c("#6baed6","#08519c")
 census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE, install = TRUE)
 ```
 
-```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%'}
-knitr::include_graphics("santa-monica.png")
+```{r pressure, result=TRUE,echo=FALSE,fig.cap="Response Time Santa Monica", out.width = '100%'}
+include_graphics("./santa_monica.png")
 ```
 # Exploratory Analysis 
 
