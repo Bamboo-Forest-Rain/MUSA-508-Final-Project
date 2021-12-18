@@ -70,6 +70,8 @@ Schedule records the ambulance available time in a day.
 
 You can decide the detail information to dispatch your ambulance, such as location, time, what equipment to carry in an ambulance.
 
+# 3. Data loading and Exploratory Analysis 
+
 
 ```{r library and functions}
 library(osmdata)
@@ -146,7 +148,6 @@ census_api_key("94efffd19b56ad527e379faea1653ee74dc3de4a",overwrite = TRUE, inst
 include_graphics("./santa_monica.png")
 ```
 
-# Exploratory Analysis 
 
 Our EMS data is filtered from the 911 calls on Santa Monica's open portal. To obtain a unbiased data set, we decided to only analyze the EMS calls from March to November in 2021. This is to eliminate any uncertainty from the pandemic while keeping the data as recent as possible. 
 
@@ -651,7 +652,7 @@ fishnet_all$DowntownDistance <- fishnet_all$DowntownDistance %>% scale()
 fishnet_all$school.nn <- fishnet_all$school.nn %>% scale()
 ```
 
-# Developing Models
+# 4. Developing Models
 
 We first split our fishnet into a training set and testing set. Training set contains every data point between March and September. Testing set has every data point between September and November. 
 
@@ -666,7 +667,7 @@ ride.Test <- filter(fishnet_all, week >= 35)
 group_by(fishnet_all, month, uniqueID) %>%na.omit()%>%
   summarize(countEMS = sum(countEMS)) %>%
   ungroup() %>% 
-  ggplot() + geom_sf(data = SanMon_Bound, fill="grey70") + geom_sf(aes(fill = countEMS)) +
+  ggplot() + geom_sf(data = SanMon_Bound, fill="grey90") + geom_sf(aes(fill = countEMS)) +
     facet_wrap(~month, ncol = 4) +
     scale_fill_viridis_b(name = "EMS Call Count") +
     labs(title="Sum of calls by fishnet by Month", caption = "Fig 8") +
@@ -745,7 +746,7 @@ stargazer(reg2, type = "html")
 
 Regression 1 has an r-square only of 0.27. Regression 2 tripled that r-square and made it to 0.82. This means our model is very temporally and geographically dependent.
 
-# Validation
+# 5. Validation
 
 The model is being tested and compared to the test set. We first develop a week nest, since the we plan to run the model to predict the calls on week basis. 
 
@@ -910,11 +911,11 @@ Fig 11 and 12 shows the distribution of the mean absolute errors after cross-val
 
 When mapping the errors out in Fig 13 and 14, we realize that the errors are geographically biased around the downtown area and seems to be related to the distance to the downtown - the further away, the less the error. This suggests that we should incorporate better geographically related data in the next version. 
 
-# Conclusion : Does our model meet the use case?
+# 6. Conclusion : Does our model meet the use case?
 
 We believe that our model meets the use case, though there is still space to improve. Our model has generated accurate results with a very low mean absolute error of averagely 6 per day. It will serve relatively well to the stations when determining the demand over time and allocate ambulances before the peak demand arrives. However, one needs to be very careful when applying our model to the downtown area, we suggest to leave the downtown area out (the fishnet cell with an MAE above 250) for this version. We shall improve the model and reduce the MAE next time.
 
-# What is coming next with beepo?
+# 7. What is coming next with beepo?
 
 Our version 0.2 will be upgraded with the following:
 
